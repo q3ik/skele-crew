@@ -86,7 +86,7 @@ If output involves: [relevant high-risk domains for this agent] → pause and re
 ### Namespace Prefix Convention
 - `product:[slug]:*` — e.g., `product:buzzy-game`
 - `decision:[YYYY-MM-DD]:[short-description]`
-- `deadline:[YYYY-QX]:[description]`
+- `deadline:[YYYY-Q1]:[description]` (use Q1–Q4)
 - `lesson:[YYYY-MM-DD]:[short-description]`
 
 ### Product Entity
