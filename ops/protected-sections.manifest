@@ -2,6 +2,8 @@ protected_blocks:
   - tag: "PROTECTED: financial-thresholds"
     files:
       - ".github/agents/accountant.agent.md"
+      - ".github/agents/coo.agent.md"
+      - ".github/agents/improver.agent.md"
       # cfo.agent.md does not exist yet — created in Milestone 5 (Issue #32)
       # Uncomment when the file is created:
       # - ".github/agents/cfo.agent.md"
@@ -11,7 +13,10 @@ protected_blocks:
   - tag: "PROTECTED: legal-compliance"
     files:
       - ".github/agents/accountant.agent.md"
+      - ".github/agents/marketing.agent.md"
+      - ".github/agents/improver.agent.md"
       - ".github/skills/jurisdiction-tax/SKILL.md"
+      - ".github/skills/ontario-canada-tax/SKILL.md"
       # lawyer.agent.md does not exist yet — Post-Launch (Milestone 5+)
       # Uncomment when the file is created:
       # - ".github/agents/lawyer.agent.md"
@@ -20,6 +25,7 @@ protected_blocks:
 
   - tag: "PROTECTED: auth-logic"
     files:
+      - ".github/agents/improver.agent.md"
       # cto.agent.md does not exist yet — Post-Launch (Milestone 5+)
       # Uncomment when the file is created:
       # - ".github/agents/cto.agent.md"

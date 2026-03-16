@@ -23,7 +23,9 @@ NEVER propose changes to sections tagged:
 - `<!-- PROTECTED: auth-logic -->`
 
 These are enforced by the runner-side pre-merge hook, not by this agent's judgment.
-<!-- END PROTECTED -->
+<!-- END PROTECTED: auth-logic -->
+<!-- END PROTECTED: legal-compliance -->
+<!-- END PROTECTED: financial-thresholds -->
 
 ## Self-Improvement Cycle (Monthly)
 1. Query all lesson entities from past 30 days
