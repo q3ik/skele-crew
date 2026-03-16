@@ -33,5 +33,6 @@
 |--------|----------|-----------------|
 | Bluesky followers | — | — |
 | Mastodon followers | — | — |
-| dev.to subscribers | — | — |
+| dev.to followers | — | — |
+| Reddit karma | — | — |
 | Avg post impressions | — | — |
