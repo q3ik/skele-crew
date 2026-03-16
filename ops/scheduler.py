@@ -73,7 +73,7 @@ def _load_metric_entities(graph_path: Path) -> dict[str, dict[str, str]]:
     ``metric:prompt:*:last-run`` entity found in *graph_path*.
 
     Corrupt / schema-invalid lines are silently skipped (mirrors the
-    behaviour of ``KnowledgeGraphManager.loadGraph``).
+    behavior of ``KnowledgeGraphManager.loadGraph``).
     """
     metrics: dict[str, dict[str, str]] = {}
 

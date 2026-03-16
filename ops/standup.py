@@ -1,5 +1,5 @@
 """
-COO standup helpers.
+COO (Chief Operating Officer) standup helpers.
 
 This module keeps the standup composition logic close to other operational
 helpers.  The key integration is the periodic prompt scheduler: overdue
