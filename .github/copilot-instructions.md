@@ -1,8 +1,7 @@
 # Company Identity
-<!-- FILL IN: Replace placeholders with your actual company details -->
-- Solo founder operating [YOUR_COMPANY_NAME]
-- Based in [YOUR_LOCATION]
-- Products: [list your products with brief descriptions]
+- Solo founder operating q3ik
+- Based in Ontario, Canada
+- Products: Buzzy Game — spelling bee educational game (web app)
 
 # Agent System
 - Agents live in `.github/agents/`
@@ -17,8 +16,7 @@
 - Use namespace prefixes: `product:[slug]:*` for product-specific entities
 
 # Product Registry
-<!-- FILL IN: Add your products here -->
-- `[product-slug]`: description, tech stack, deploy target, status
+- `buzzy-game`: Spelling bee educational game, TypeScript/React/Node.js, Cloudflare Pages + Workers + Supabase, active
 
 # Inter-Agent Rules
 - COO is the only agent that may initiate multi-agent chains
