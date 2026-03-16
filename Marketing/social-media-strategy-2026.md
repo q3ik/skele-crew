@@ -31,6 +31,8 @@
 <!-- FILL IN: Your success metrics -->
 | Metric | Baseline | Target (Q4 2026) |
 |--------|----------|-----------------|
-| X followers | — | — |
-| dev.to subscribers | — | — |
+| Bluesky followers | — | — |
+| Mastodon followers | — | — |
+| dev.to followers | — | — |
+| Reddit karma | — | — |
 | Avg post impressions | — | — |

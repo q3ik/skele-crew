@@ -3,16 +3,18 @@
 > Used by the Marketing Agent for all social media activities.
 
 ## Platforms
-- X (Twitter): Primary technical audience
-- dev.to: Long-form technical articles
-<!-- FILL IN: Add other platforms as needed -->
+- **dev.to**: Long-form technical articles and build logs. All posts created as drafts (`published: false`) until reviewed.
+- **Bluesky**: Short-form updates, announcements, and community engagement (max 300 chars).
+- **Mastodon** (fosstodon.org): FOSS/indie-dev community. Status posts up to 500 chars.
+- **Reddit**: Developer communities (r/programming, r/webdev, etc.). ⚠️ Requires human review before every submission — agent must present a preview and wait for explicit approval (`confirm: true`).
+- **Threads**: ⏳ Pending Meta app review — not yet active. See `mcp/social-media-server/platforms/threads.TODO.md`.
 
 ## Posting Schedule
 | Day | Content Type | Platform |
 |-----|-------------|----------|
-| Monday | Technical deep-dive or build log | X + dev.to |
-| Wednesday | Product update or feature launch | X |
-| Friday | Community engagement or lessons learned | X |
+| Monday | Technical deep-dive or build log | dev.to (draft) + Bluesky |
+| Wednesday | Product update or feature launch | Bluesky + Mastodon |
+| Friday | Community engagement or lessons learned | Mastodon + Reddit (with human review) |
 
 ## Pre-Publish Checklist
 - [ ] Does the post contain any percentage/accuracy claims? → Lawyer review required
