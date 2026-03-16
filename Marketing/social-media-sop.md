@@ -22,6 +22,7 @@
 - [ ] Is the voice first-person singular ("I", not "we")? ✓
 - [ ] Is the content substantive (code, numbers, real examples)? ✓
 - [ ] No banned words: revolutionary, game-changing, leverage, synergy, disruptive? ✓
+- [ ] Reddit posts: human approval obtained before submitting? ✓
 
 ## Content Rotation
 <!-- FILL IN: List your products and rotation schedule -->
@@ -29,5 +30,5 @@ Rotate across products evenly. Each product should appear in the content calenda
 
 ## Engagement Rules
 - Reply to any comment within 24 hours
-- Like/follow relevant accounts in the technical community daily
+- Follow/engage with relevant accounts in the technical community daily
 - Do not engage with inflammatory or off-topic threads

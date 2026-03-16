@@ -18,7 +18,7 @@
 ## Content Pillars
 1. **Build in public** — share real numbers, real code, honest failures
 2. **Product updates** — launch announcements, feature releases, roadmap
-3. **Lessons learned** — what worked, what failed, what I'd do differently
+3. **Lessons learned** — what worked, what failed, what I’d do differently
 4. **Community** — engage with others building in public
 
 ## Q1 2026 Themes
