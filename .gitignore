@@ -13,3 +13,8 @@ dist/
 
 # Local MCP overrides (if needed)
 .vscode/mcp.json.local
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
