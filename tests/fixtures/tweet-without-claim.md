@@ -2,13 +2,15 @@
 
 > Fixture for Marketing→Lawyer peer review test.
 > This draft contains NO percentage/accuracy claims and must NOT trigger Lawyer review.
+>
+> File named tweet-without-claim.md for historical reasons; represents any short-form post.
 
 ---
 
 ## Draft Post
 
 Just shipped a new word pack for Buzzy Game 🐝
-Fresh spelling challenges for every grade level — give it a try! buzzy-game.pages.dev
+New spelling challenges are live — give it a try! buzzy-game.pages.dev
 
 ---
 

@@ -23,20 +23,24 @@ if [[ ! -f "$FILE" ]]; then
     exit 1
 fi
 
-REQUIRED_FIELDS=(
-    "**From**:"
-    "**Call chain**:"
-    "**Depth**:"
-    "**Task**:"
-    "**What I did**:"
-    "**What I need"
+# Each entry is an ERE pattern anchored to the start of a line.
+# Matches the exact field labels from TEMPLATES.md:
+#   **What I need**: (short form)
+#   **What I need from you**: (long form used by Marketing agent)
+REQUIRED_PATTERNS=(
+    '^\*\*From\*\*:'
+    '^\*\*Call chain\*\*:'
+    '^\*\*Depth\*\*:'
+    '^\*\*Task\*\*:'
+    '^\*\*What I did\*\*:'
+    '^\*\*What I need(\*\*:| from you\*\*:)'
 )
 
 MISSING=0
 
-for field in "${REQUIRED_FIELDS[@]}"; do
-    if ! grep -qF "$field" "$FILE"; then
-        echo "MISSING required field: $field" >&2
+for pattern in "${REQUIRED_PATTERNS[@]}"; do
+    if ! grep -qE "$pattern" "$FILE"; then
+        echo "MISSING required field matching: $pattern" >&2
         MISSING=$((MISSING + 1))
     fi
 done

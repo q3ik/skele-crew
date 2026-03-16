@@ -2,6 +2,8 @@
 
 > Fixture for Marketing→Lawyer peer review test.
 > This draft contains a percentage/accuracy claim and MUST trigger Lawyer review.
+>
+> File named tweet-with-claim.md for historical reasons; represents any short-form post.
 
 ---
 
