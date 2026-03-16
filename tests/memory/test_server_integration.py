@@ -15,6 +15,7 @@ from __future__ import annotations
 import concurrent.futures
 import json
 import os
+import selectors
 import subprocess
 import threading
 from pathlib import Path
@@ -26,12 +27,35 @@ import pytest
 # Helpers
 # ---------------------------------------------------------------------------
 
+_io_lock = threading.Lock()
+
+
+def _read_line_with_timeout(proc: subprocess.Popen, timeout: float = 5.0) -> str:
+    """Read one line from proc.stdout with a timeout to avoid indefinite hangs."""
+    if proc.stdout is None:
+        raise RuntimeError("Process stdout is not available")
+
+    sel = selectors.DefaultSelector()
+    try:
+        sel.register(proc.stdout, selectors.EVENT_READ)
+        events = sel.select(timeout)
+        if not events:
+            raise TimeoutError("Timed out waiting for MCP response")
+        return proc.stdout.readline()
+    finally:
+        sel.unregister(proc.stdout)
+        sel.close()
+
+
 def send_mcp(proc: subprocess.Popen, method: str, params: dict, id: int) -> dict:
     """Write a JSON-RPC 2.0 request to stdin and return the parsed response."""
     request = json.dumps({"jsonrpc": "2.0", "id": id, "method": method, "params": params})
-    proc.stdin.write((request + "\n").encode())
-    proc.stdin.flush()
-    line = proc.stdout.readline()
+    with _io_lock:
+        if proc.stdin is None:
+            raise RuntimeError("Process stdin is not available")
+        proc.stdin.write(request + "\n")
+        proc.stdin.flush()
+        line = _read_line_with_timeout(proc)
     return json.loads(line)
 
 
@@ -54,8 +78,9 @@ def server(tmp_path: Path):
         ["node", _server_binary()],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
         env=env,
+        text=True,
     )
     yield proc
     proc.terminate()
