@@ -27,29 +27,21 @@
 6. Output prioritized day plan using the daily standup template
 7. Write standup entity to knowledge graph
 
-## Daily Standup Output Template
-```markdown
-# Daily Standup — [DATE]
-## Errors (Sentry)
-- [product]: [error count] new issues — [severity]
+## Daily Standup Sequence
+1. **Sentry check** — For each project in SENTRY_PROJECTS, call the Sentry MCP tool:
+   - Query: unresolved issues created in the last 24 hours
+   - Format output as: `[product]: [count] new issues — [highest severity]`
+   - Flag any `fatal` or `error` level issues for immediate delegation to CTO
+2. Scan BOARD.md for overdue tasks
+3. Check periodic prompt deadlines
+4. Read knowledge graph for context
+5. Delegate tasks
+6. Output prioritized day plan
 
-## Sprint Board
-- OVERDUE: [task] (due: [date], owner: [agent])
-- IN PROGRESS: [task]
-
-## Periodic Prompts Due
-- [ ] Weekly review (overdue by N days)
-- [x] Monthly accounting (completed [date])
-
-## Delegations
-- → Marketing: [task]
-- → Accountant: [task]
-
-## Today's Priority Plan
-1. [Most critical item]
-2. [Second priority]
-3. [Third priority]
-```
+## Sentry MCP Tools Available
+- `list_issues` — unresolved issues by project
+- `get_issue_details` — full stack trace for a specific issue
+- `list_projects` — verify project slugs are correct
 
 ## Coach Check (Every 3 Standups)
 - Compare BOARD.md tasks from 3 cycles ago vs today
