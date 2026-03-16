@@ -1,0 +1,28 @@
+protected_blocks:
+  - tag: "PROTECTED: financial-thresholds"
+    files:
+      - ".github/agents/accountant.agent.md"
+      - ".github/agents/cfo.agent.md"
+    enforcement: block-merge
+    description: "Financial limits and payment authorization rules. Any change requires human approval and audit trail."
+
+  - tag: "PROTECTED: legal-compliance"
+    files:
+      - ".github/agents/lawyer.agent.md"
+      - ".github/agents/accountant.agent.md"
+      - ".github/skills/jurisdiction-tax/SKILL.md"
+    enforcement: block-merge
+    description: "Regulatory compliance rules and tax law. Changes require verified legal/tax professional review."
+
+  - tag: "PROTECTED: auth-logic"
+    files:
+      - ".github/agents/cto.agent.md"
+    enforcement: block-merge
+    description: "Authentication and authorization logic. Changes require security review and human sign-off."
+
+runner_checks:
+  - on: pre-merge
+    action: diff-against-manifest
+    script: ".github/hooks/pre-merge-check.sh"
+    on_violation: auto-reject
+    description: "Machine-checked, not agent-checked. Agent cannot validate its own output."
