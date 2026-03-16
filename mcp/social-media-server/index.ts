@@ -16,6 +16,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import path from "path";
+import { fileURLToPath } from "url";
+import dotenv from "dotenv";
 
 import { devtoCreateArticle } from "./platforms/devto.js";
 import { blueskyPost } from "./platforms/bluesky.js";
@@ -76,9 +79,9 @@ server.tool(
 
 server.tool(
   "bluesky_post",
-  "Post a text update to Bluesky (AT Protocol). Maximum 300 characters; longer text is truncated.",
+  "Post a text update to Bluesky (AT Protocol). Text longer than 300 characters will be automatically and silently truncated to the platform limit — ensure your text is within 300 characters for exact posting.",
   {
-    text: z.string().min(1).max(300).describe("Post text (max 300 characters)"),
+    text: z.string().min(1).describe("Post text (automatically truncated to 300 characters if longer)"),
   },
   async ({ text }) => {
     const result = await blueskyPost({ text });
@@ -198,5 +201,28 @@ server.tool(
 // Start server
 // ---------------------------------------------------------------------------
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+async function main() {
+  // Load .env from the current working directory so users can simply copy
+  // .env.example → .env without needing to export vars in their shell.
+  dotenv.config();
+
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("Social Media MCP Server running on stdio");
+}
+
+// Only start the stdio server when this file is the CLI entry point.
+// Importing the module in tests or other consumers will NOT start the server.
+// Both paths are normalised before comparison to handle different OS path
+// separator and casing differences.
+const isMain =
+  process.argv[1] !== undefined &&
+  path.normalize(path.resolve(process.argv[1])) ===
+    path.normalize(fileURLToPath(import.meta.url));
+
+if (isMain) {
+  main().catch((error) => {
+    console.error("Fatal error in main():", error);
+    process.exit(1);
+  });
+}

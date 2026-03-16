@@ -36,6 +36,10 @@ cp .env.example .env
 # Edit .env with your credentials
 ```
 
+The server automatically loads `.env` from the current working directory at
+startup via [dotenv](https://github.com/motdotla/dotenv), so no shell export
+step is needed.
+
 See the **Platform Auth** section below for how to obtain each credential.
 
 ### 4. Run locally
@@ -147,7 +151,7 @@ and action items.
 
 | Parameter | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `text` | string | ✅ | — | Post text (max 300 chars; longer text is truncated) |
+| `text` | string | ✅ | — | Post text (automatically truncated to 300 characters if longer) |
 
 ---
 
