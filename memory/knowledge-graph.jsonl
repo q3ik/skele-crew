@@ -1,4 +1,4 @@
-{"type":"entity","name":"product:skele-crew","entityType":"product","observations":["status: active","description: AI agent company management repo","deploy: github","stack: markdown/mcp","created: 2026-03-16"]}
+{"type":"entity","name":"system:skele-crew","entityType":"system","observations":["status: active","description: AI agent company management infrastructure (this repo)","deploy: github","stack: markdown/mcp","created: 2026-03-16","note: not a product — reclassified from product: to system: to avoid confusion in product queries"]}
 {"type":"entity","name":"product:buzzy-game","entityType":"product","observations":["status: active","description: Spelling bee educational web app","stack: TypeScript/React/Node.js","deploy: Cloudflare Pages + Workers","url: buzzy-game.pages.dev"]}
 {"type":"entity","name":"deadline:2026-Q2:hst-filing","entityType":"deadline","observations":["due: 2026-04-30","owner: accountant","status: pending","type: tax"]}
 {"type":"entity","name":"decision:2026-03-16:repo-initialized","entityType":"decision","observations":["choice: created skele-crew management repo","rationale: following solo-founder AI agent company architecture","agent: human"]}
@@ -6,4 +6,4 @@
 {"type":"relation","from":"agent:coo","to":"product:buzzy-game","relationType":"owns"}
 {"type":"relation","from":"product:buzzy-game","to":"service:supabase","relationType":"uses"}
 {"type":"relation","from":"product:buzzy-game","to":"technology:typescript","relationType":"built-with"}
-{"type":"relation","from":"product:buzzy-game","to":"product:skele-crew","relationType":"depends-on"}
+{"type":"relation","from":"product:buzzy-game","to":"system:skele-crew","relationType":"managed-by"}

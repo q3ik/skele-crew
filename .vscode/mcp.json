@@ -1,5 +1,15 @@
 {
 	"servers": {
+		"skele-crew-memory": {
+			"type": "stdio",
+			"command": "node",
+			"args": [
+				"${workspaceFolder}/mcp/memory-server/dist/index.js"
+			],
+			"env": {
+				"MEMORY_FILE_PATH": "${workspaceFolder}/memory/knowledge-graph.jsonl"
+			}
+		},
 		"io.github.getsentry/sentry-mcp": {
 			"type": "stdio",
 			"command": "npx",

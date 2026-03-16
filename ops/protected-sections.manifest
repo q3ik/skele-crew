@@ -2,21 +2,27 @@ protected_blocks:
   - tag: "PROTECTED: financial-thresholds"
     files:
       - ".github/agents/accountant.agent.md"
-      - ".github/agents/cfo.agent.md"
+      # cfo.agent.md does not exist yet — created in Milestone 5 (Issue #32)
+      # Uncomment when the file is created:
+      # - ".github/agents/cfo.agent.md"
     enforcement: block-merge
     description: "Financial limits and payment authorization rules. Any change requires human approval and audit trail."
 
   - tag: "PROTECTED: legal-compliance"
     files:
-      - ".github/agents/lawyer.agent.md"
       - ".github/agents/accountant.agent.md"
       - ".github/skills/jurisdiction-tax/SKILL.md"
+      # lawyer.agent.md does not exist yet — Post-Launch (Milestone 5+)
+      # Uncomment when the file is created:
+      # - ".github/agents/lawyer.agent.md"
     enforcement: block-merge
     description: "Regulatory compliance rules and tax law. Changes require verified legal/tax professional review."
 
   - tag: "PROTECTED: auth-logic"
     files:
-      - ".github/agents/cto.agent.md"
+      # cto.agent.md does not exist yet — Post-Launch (Milestone 5+)
+      # Uncomment when the file is created:
+      # - ".github/agents/cto.agent.md"
     enforcement: block-merge
     description: "Authentication and authorization logic. Changes require security review and human sign-off."
 
