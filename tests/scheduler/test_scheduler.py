@@ -18,6 +18,7 @@ from ops.scheduler import (
     check_overdue,
     format_standup_block,
 )
+from ops.standup import build_coo_standup
 
 
 # ---------------------------------------------------------------------------
@@ -250,6 +251,38 @@ class TestCheckOverdueMissingEntities:
         assert "weekly-review" not in slugs  # valid entity read correctly
 
 
+class TestCheckOverduePathResolution:
+    def test_default_path_uses_cwd_memory_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Regression: ensure default graph path resolves from CWD, matching MCP memory server."""
+        new_cwd = tmp_path / "repo-root"
+        memory_dir = new_cwd / "memory"
+        memory_dir.mkdir(parents=True)
+        graph = memory_dir / "knowledge-graph.jsonl"
+
+        today = date(2026, 3, 16)
+        _write_metric_entity(graph, "weekly-review", (today - timedelta(days=14)).isoformat(), 7)
+
+        monkeypatch.chdir(new_cwd)
+
+        result = check_overdue(today=today)
+        slugs = {r["slug"] for r in result}
+        assert "weekly-review" in slugs
+
+    def test_duplicate_metric_entities_keep_first_occurrence(self, tmp_path: Path) -> None:
+        """Aligns with KnowledgeGraphManager dedupe semantics (first occurrence wins)."""
+        graph = tmp_path / "knowledge-graph.jsonl"
+        today = date(2026, 3, 16)
+
+        # First line: up to date (should win)
+        _write_metric_entity(graph, "weekly-review", today.isoformat(), 7)
+        # Duplicate later line: stale/overdue — should be ignored
+        _write_metric_entity(graph, "weekly-review", "2026-01-01", 7)
+
+        result = check_overdue(graph_path=graph, today=today)
+        slugs = {r["slug"] for r in result}
+        assert "weekly-review" not in slugs, f"Duplicate line should be ignored, got {result}"
+
+
 # ---------------------------------------------------------------------------
 # 5. format_standup_block
 # ---------------------------------------------------------------------------
@@ -284,3 +317,25 @@ class TestFormatStandupBlock:
         assert "weekly-review" in result
         assert "monthly-accounting" in result
         assert "quarterly-hst" in result
+
+
+class TestBuildCooStandup:
+    def test_standup_includes_scheduler_block_when_overdue(self, tmp_path: Path) -> None:
+        graph = tmp_path / "knowledge-graph.jsonl"
+        today = date(2026, 3, 16)
+        # weekly-review: 8 days overdue acceptance criterion
+        _write_metric_entity(graph, "weekly-review", (today - timedelta(days=14)).isoformat(), 7)
+
+        sections = build_coo_standup(graph_path=graph, today=today)
+        assert sections, "Expected scheduler block to be included"
+        assert any("weekly-review" in section for section in sections)
+        assert any("overdue" in section.lower() for section in sections)
+
+    def test_standup_omits_scheduler_block_when_clear(self, tmp_path: Path) -> None:
+        graph = tmp_path / "knowledge-graph.jsonl"
+        today = date(2026, 3, 16)
+        for slug, cadence in PROMPTS.items():
+            _write_metric_entity(graph, slug, today.isoformat(), cadence)
+
+        sections = build_coo_standup(graph_path=graph, today=today)
+        assert sections == []

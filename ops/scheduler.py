@@ -52,8 +52,14 @@ PROMPTS: dict[str, int] = {
     "quarterly-hst": 90,
 }
 
-#: Default path to the shared knowledge graph (relative to repo root)
-_DEFAULT_GRAPH_PATH = Path(__file__).parent.parent / "memory" / "knowledge-graph.jsonl"
+def _default_graph_path() -> Path:
+    """Return the default knowledge graph path rooted at the current working directory."""
+    return Path.cwd() / "memory" / "knowledge-graph.jsonl"
+
+
+def _resolve_graph_path(graph_path: Path | str | None) -> Path:
+    """Resolve the caller-provided graph_path or fall back to the default."""
+    return Path(graph_path) if graph_path is not None else _default_graph_path()
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -93,6 +99,11 @@ def _load_metric_entities(graph_path: Path) -> dict[str, dict[str, str]]:
             continue
 
         slug = m.group(1)
+        # Deduplicate: keep the first occurrence of each metric entity to align
+        # with KnowledgeGraphManager's "first wins" behaviour.
+        if slug in metrics:
+            continue
+
         observations = record.get("observations")
         if not isinstance(observations, list):
             continue
@@ -144,7 +155,7 @@ def check_overdue(
     ``overdue_days``
         How many calendar days past due (always ≥ 1 for returned items).
     """
-    resolved_path = Path(graph_path) if graph_path is not None else _DEFAULT_GRAPH_PATH
+    resolved_path = _resolve_graph_path(graph_path)
     ref_date = today if today is not None else date.today()
 
     metrics = _load_metric_entities(resolved_path)

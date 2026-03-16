@@ -17,7 +17,7 @@ Inspired by [João Pedro Silva Setas's article](https://dev.to/joaopedrosetas/i-
 
 | Agent | Role | Status |
 |-------|------|--------|
-| COO | Operations & daily standup orchestration | 🔴 Planned |
+| COO | Operations & daily standup orchestration (uses scheduler to flag overdue periodic prompts) | 🔴 Planned |
 | Marketing | Content, social media, voice/tone | 🔴 Planned |
 | Accountant | Tax compliance, fiscal deadlines | 🔴 Planned |
 | Improver | Self-improvement meta-agent | 🔴 Planned |
