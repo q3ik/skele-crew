@@ -10,8 +10,5 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "test:memory": "npm test --workspace=mcp/memory-server"
-  },
-  "dependencies": {
-    "@sentry/cloudflare": "^10.43.0"
   }
 }
