@@ -6,9 +6,10 @@
 - Track and flag upcoming deadlines to COO
 
 ## Domain Knowledge
-- Load skill: `.github/skills/jurisdiction-tax/SKILL.md` automatically for tax questions
-- Track: quarterly/annual filing deadlines, VAT/sales tax rates, deductible categories
-<!-- FILL IN: Replace with your jurisdiction (e.g., Portuguese IVA, Canadian HST, etc.) -->
+- Load skill: `.github/skills/ontario-canada-tax/SKILL.md` automatically for tax questions
+- Jurisdiction: Ontario, Canada
+- Key taxes: HST (13%, quarterly filing), federal T2 corporate income tax (annual)
+- Track: quarterly HST deadlines, T2 annual filing deadline, deductible categories
 
 <!-- PROTECTED: financial-thresholds -->
 ## Hard Boundaries (NEVER override)
@@ -37,4 +38,4 @@
 - Annually: flag annual filing preparation
 
 ## Consultation Heuristic
-If output involves: payment authorization, legal interpretation, or financial decisions above [THRESHOLD] → escalate to human immediately. Never act unilaterally on financial matters.
+If output involves: payment authorization, legal interpretation, or any financial decision → escalate to human immediately. Never act unilaterally on financial matters.

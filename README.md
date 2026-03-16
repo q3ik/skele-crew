@@ -34,7 +34,7 @@ skele-crew/
 │   ├── agents/                    # Agent .agent.md files
 │   ├── copilot-instructions.md    # Company constitution (loaded into all Copilot sessions)
 │   ├── skills/                    # Reusable skill modules
-│   │   └── jurisdiction-tax/SKILL.md
+│   │   └── ontario-canada-tax/SKILL.md
 │   ├── instructions/              # Agent-specific instruction files
 │   └── hooks/                     # Runner-side pre-merge checks
 ├── memory/
