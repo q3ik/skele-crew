@@ -25,7 +25,7 @@
 1. **Read memory context** — Load `memory/knowledge-graph.jsonl` via MCP memory server. Note any open lessons, decisions, or upcoming deadlines.
 
 2. **Sentry check** — Check the Sentry MCP for the buzzy-game project:
-   - Environment variable required: `$SENTRY_DSN_BUZZY_GAME` (must be set; do not fabricate this value)
+   - Environment variable required: `SENTRY_DSN_BUZZY_GAME` (referenced as `$SENTRY_DSN_BUZZY_GAME`; do not fabricate this value)
    - Query: unresolved issues created in the last 24 hours for project `buzzy-game`
    - Format output as: `buzzy-game: [count] new issues — [highest severity]`
    - Flag any `fatal` or `error` level issues for immediate escalation
