@@ -10,7 +10,7 @@ protected_blocks:
     files:
       - ".github/agents/lawyer.agent.md"
       - ".github/agents/accountant.agent.md"
-      - ".github/skills/jurisdiction-tax/SKILL.md"
+      - ".github/skills/ontario-canada-tax/SKILL.md"
     enforcement: block-merge
     description: "Regulatory compliance rules and tax law. Changes require verified legal/tax professional review."
 

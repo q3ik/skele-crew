@@ -19,7 +19,7 @@
 
 | Task | Owner | Completed |
 |------|-------|-----------|
-| _(none)_ | | |
+| Create Accountant agent file | Copilot | 2026-03-16 |
 
 ## 📅 Upcoming
 
@@ -28,8 +28,6 @@
 | Set up MCP memory server | Human | Week 1 |
 | Write copilot-instructions.md | Human | Week 1 |
 | Create COO agent file | Human | Week 1 |
-| Create Marketing agent file | Human | Week 2 |
-| Create Accountant agent file | Human | Week 2 |
 
 ## 🔄 Periodic Prompts
 

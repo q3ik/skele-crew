@@ -16,7 +16,7 @@ skele-crew/
 │   │   └── accountant.agent.md
 │   ├── copilot-instructions.md      # Global company identity
 │   ├── skills/
-│   │   └── jurisdiction-tax/SKILL.md
+│   │   └── ontario-canada-tax/SKILL.md
 │   └── instructions/
 │       └── marketing.instructions.md
 ├── memory/
