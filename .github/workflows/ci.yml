@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Memory server — TypeScript build + Vitest unit tests
+  # -----------------------------------------------------------------------
+  memory-server:
+    name: Memory Server (build + test)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: mcp/memory-server
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          # Cache scoped to the memory-server lockfile only.
+          # The root package-lock.json covers workspace metadata; the actual
+          # memory-server dependencies live in mcp/memory-server/package-lock.json.
+          cache: "npm"
+          cache-dependency-path: mcp/memory-server/package-lock.json
+
+      - name: Install dependencies
+        # Run npm ci inside mcp/memory-server (enforced by defaults.run.working-directory)
+        # This uses the sub-package lockfile, not the root workspace lockfile.
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Run unit tests (Vitest)
+        run: npm test
+
+  # -----------------------------------------------------------------------
+  # Python memory tests (write contention + atomic write integration tests)
+  # -----------------------------------------------------------------------
+  python-tests:
+    name: Python Tests (pytest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest
+        run: pip install pytest pytest-asyncio
+
+      - name: Run Python tests
+        run: pytest
+
+  # -----------------------------------------------------------------------
+  # Protected sections check — validates manifest-listed files haven't had
+  # PROTECTED blocks altered without human review.
+  # Runs on PRs to main only.
+  # -----------------------------------------------------------------------
+  protected-sections:
+    name: Protected Sections Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run pre-merge protection check
+        run: |
+          chmod +x .github/hooks/pre-merge-check.sh
+          .github/hooks/pre-merge-check.sh
