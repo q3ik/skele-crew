@@ -83,6 +83,12 @@ If output involves: [relevant high-risk domains for this agent] → pause and re
 
 ## Knowledge Graph Entity Templates
 
+### Namespace Prefix Convention
+- `product:[slug]:*` — e.g., `product:buzzy-game`
+- `decision:[YYYY-MM-DD]:[short-description]`
+- `deadline:[YYYY-QX]:[description]`
+- `lesson:[YYYY-MM-DD]:[short-description]`
+
 ### Product Entity
 ```jsonl
 {"type":"entity","name":"product:[slug]","entityType":"product","observations":["status: active|inactive","description: [brief]","stack: [tech]","deploy: [target]","url: [url]"]}
@@ -107,6 +113,11 @@ If output involves: [relevant high-risk domains for this agent] → pause and re
 ```jsonl
 {"type":"entity","name":"standup:[YYYY-MM-DD]","entityType":"standup","observations":["errors: [count]","overdue-tasks: [count]","delegations: [list]","priority-1: [task]"]}
 ```
+
+### Retention Rules
+- `standup` entities: prune after 7 days
+- `lesson`, `decision`, `deadline` entities: permanent
+- `metric` entities: archive after 90 days (keep summary)
 
 ### Metric Entity (citation tracking)
 ```jsonl
