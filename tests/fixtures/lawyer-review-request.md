@@ -11,8 +11,8 @@
 **From**: Marketing
 **Call chain**: Marketing → Lawyer
 **Depth**: 1
-**Task**: Drafting a tweet for Buzzy Game to post on X (Twitter)
-**What I did**: Drafted the following tweet containing a percentage/accuracy claim — "99% spelling accuracy across all grade levels" — which triggers mandatory Lawyer review per the Pre-Publish Checklist.
+**Task**: Drafting a social media post for Buzzy Game to publish on Bluesky
+**What I did**: Drafted the following post containing a percentage/accuracy claim — "99% spelling accuracy across all grade levels" — which triggers mandatory Lawyer review per the Pre-Publish Checklist.
 
 > Buzzy Game keeps kids spelling sharp — with **99% spelling accuracy** across all grade levels.
 > Try it free today 🐝 buzzy-game.pages.dev
