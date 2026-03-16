@@ -44,15 +44,27 @@ jobs:
         run: npm test
 
   # -----------------------------------------------------------------------
-  # Python memory tests (write contention + atomic write integration tests)
+  # Integration smoke tests — spawns the compiled MCP binary and exercises
+  # the MCP JSON-RPC protocol end-to-end via pytest subprocess tests
   # -----------------------------------------------------------------------
-  python-tests:
-    name: Python Tests (pytest)
+  integration-smoke:
+    name: Integration Smoke Tests (pytest)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build memory server
+        working-directory: mcp/memory-server
+        run: npm ci && npm run build
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -62,7 +74,7 @@ jobs:
       - name: Install pytest
         run: pip install pytest pytest-asyncio
 
-      - name: Run Python tests
+      - name: Run integration smoke tests
         run: pytest
 
   # -----------------------------------------------------------------------

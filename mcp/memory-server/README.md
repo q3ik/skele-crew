@@ -58,6 +58,7 @@ npm test             # runs Vitest unit + hardening suites with coverage
 |------|---------------|
 | `__tests__/knowledge-graph.test.ts` | CRUD operations, dedup, persistence, search, openNodes |
 | `__tests__/hardening.test.ts` | Mutex concurrency, atomic writes, auto-repair, schema validation, legacy migration, default path |
+| `tests/memory/test_server_integration.py` | Integration smoke tests — spawns compiled binary, exercises MCP protocol end-to-end |
 
 ## MCP tools exposed
 
