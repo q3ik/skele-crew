@@ -1,3 +1,9 @@
 {"type":"entity","name":"product:skele-crew","entityType":"product","observations":["status: active","description: AI agent company management repo","deploy: github","stack: markdown/mcp","created: 2026-03-16"]}
+{"type":"entity","name":"product:buzzy-game","entityType":"product","observations":["status: active","description: Spelling bee educational web app","stack: TypeScript/React/Node.js","deploy: Cloudflare Pages + Workers","url: buzzy-game.pages.dev"]}
+{"type":"entity","name":"deadline:2026-Q2:hst-filing","entityType":"deadline","observations":["due: 2026-04-30","owner: accountant","status: pending","type: tax"]}
 {"type":"entity","name":"decision:2026-03-16:repo-initialized","entityType":"decision","observations":["choice: created skele-crew management repo","rationale: following solo-founder AI agent company architecture","agent: human"]}
 {"type":"entity","name":"lesson:2026-03-16:start-with-three-agents","entityType":"lesson","observations":["category: architecture","summary: Start with COO/Marketing/Accountant before expanding to 8 agents","action: Milestone 1 scoped to 3 agents only","source: João Pedro Silva Setas article"]}
+{"type":"relation","from":"agent:coo","to":"product:buzzy-game","relationType":"owns"}
+{"type":"relation","from":"product:buzzy-game","to":"service:supabase","relationType":"uses"}
+{"type":"relation","from":"product:buzzy-game","to":"technology:typescript","relationType":"built-with"}
+{"type":"relation","from":"product:buzzy-game","to":"product:skele-crew","relationType":"depends-on"}
