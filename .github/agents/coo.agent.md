@@ -25,7 +25,7 @@
 1. **Read memory context** — Load `memory/knowledge-graph.jsonl` via MCP memory server. Note any open lessons, decisions, or upcoming deadlines.
 
 2. **Sentry check** — Check the Sentry MCP for the buzzy-game project:
-   - Environment variable required: `SENTRY_DSN_BUZZY_GAME` (referenced as `$SENTRY_DSN_BUZZY_GAME`; do not fabricate this value)
+   - Authentication: the Sentry MCP uses `SENTRY_ACCESS_TOKEN` (a Sentry user auth token configured in `.vscode/mcp.json`). Do not look for `SENTRY_DSN_BUZZY_GAME` — the DSN is for SDK initialisation only, not MCP queries.
    - Query: unresolved issues created in the last 24 hours for project `buzzy-game`
    - Format output as: `buzzy-game: [count] new issues — [highest severity]`
    - Flag any `fatal` or `error` level issues for immediate escalation
@@ -37,15 +37,30 @@
 
 5. **Delegate tasks** — Assign outstanding work to the appropriate agent with explicit instructions and a deadline.
 
-6. **Output day plan** — Produce a prioritized list of actions for the day in this format:
+6. **Output day plan** — Produce a prioritized list of actions for the day using the canonical template from `TEMPLATES.md` (Daily Standup Output Template):
    ```
-   ## Standup — [YYYY-MM-DD]
-   **Sentry**: buzzy-game — [count] new issues ([severity])
-   **Overdue**: [list or "none"]
-   **Delegated**: [agent] → [task]
-   **Today's priorities**:
-   1. [highest priority]
-   2. ...
+   # Daily Standup — [YYYY-MM-DD]
+
+   ## Errors (Sentry)
+   - buzzy-game: [count] new issues — [severity: low|medium|high|critical]
+
+   ## Sprint Board
+   - OVERDUE: [task] (due: [date], owner: [agent]) — or "none"
+   - IN PROGRESS: [task] (started: [date])
+
+   ## Periodic Prompts Due
+   - [ ] [prompt name] (overdue by [N] days) — or none
+
+   ## Delegations
+   - → [Agent]: [task description]
+
+   ## Today's Priority Plan
+   1. [Most critical item]
+   2. [Second priority]
+   3. [Third priority]
+
+   ## Coach Check (if applicable)
+   - DRIFT DETECTED — [agent] committed to [action] on [date], no output found
    ```
 
 7. **Write standup entity** — Append to `memory/knowledge-graph.jsonl`:

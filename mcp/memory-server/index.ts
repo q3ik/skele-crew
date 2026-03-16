@@ -375,39 +375,56 @@ export class KnowledgeGraphManager {
     });
   }
 
+  // -------------------------------------------------------------------------
+  // Hardening #1 addendum — reads also go through the mutex
+  //
+  // Without this, a concurrent write + read can return a partially-written
+  // or stale graph because loadGraph() reads directly from disk.  Wrapping
+  // reads in the same exclusive lock serialises them with writes so every
+  // read sees a fully-committed state.
+  //
+  // Trade-off: readers are serialised with writers (no reader/writer split).
+  // For the expected low-concurrency agent workload this is the right call;
+  // a shared-lock upgrade can be added later if throughput becomes a concern.
+  // -------------------------------------------------------------------------
+
   async readGraph(): Promise<KnowledgeGraph> {
-    return this.loadGraph();
+    return this.writeMutex.runExclusive(() => this.loadGraph());
   }
 
   async searchNodes(query: string): Promise<KnowledgeGraph> {
-    const graph = await this.loadGraph();
+    return this.writeMutex.runExclusive(async () => {
+      const graph = await this.loadGraph();
 
-    const filteredEntities = graph.entities.filter(e =>
-      e.name.toLowerCase().includes(query.toLowerCase()) ||
-      e.entityType.toLowerCase().includes(query.toLowerCase()) ||
-      e.observations.some(o => o.toLowerCase().includes(query.toLowerCase()))
-    );
+      const filteredEntities = graph.entities.filter(e =>
+        e.name.toLowerCase().includes(query.toLowerCase()) ||
+        e.entityType.toLowerCase().includes(query.toLowerCase()) ||
+        e.observations.some(o => o.toLowerCase().includes(query.toLowerCase()))
+      );
 
-    const filteredEntityNames = new Set(filteredEntities.map(e => e.name));
+      const filteredEntityNames = new Set(filteredEntities.map(e => e.name));
 
-    const filteredRelations = graph.relations.filter(r =>
-      filteredEntityNames.has(r.from) || filteredEntityNames.has(r.to)
-    );
+      const filteredRelations = graph.relations.filter(r =>
+        filteredEntityNames.has(r.from) || filteredEntityNames.has(r.to)
+      );
 
-    return { entities: filteredEntities, relations: filteredRelations };
+      return { entities: filteredEntities, relations: filteredRelations };
+    });
   }
 
   async openNodes(names: string[]): Promise<KnowledgeGraph> {
-    const graph = await this.loadGraph();
+    return this.writeMutex.runExclusive(async () => {
+      const graph = await this.loadGraph();
 
-    const filteredEntities = graph.entities.filter(e => names.includes(e.name));
-    const filteredEntityNames = new Set(filteredEntities.map(e => e.name));
+      const filteredEntities = graph.entities.filter(e => names.includes(e.name));
+      const filteredEntityNames = new Set(filteredEntities.map(e => e.name));
 
-    const filteredRelations = graph.relations.filter(r =>
-      filteredEntityNames.has(r.from) || filteredEntityNames.has(r.to)
-    );
+      const filteredRelations = graph.relations.filter(r =>
+        filteredEntityNames.has(r.from) || filteredEntityNames.has(r.to)
+      );
 
-    return { entities: filteredEntities, relations: filteredRelations };
+      return { entities: filteredEntities, relations: filteredRelations };
+    });
   }
 }
 
