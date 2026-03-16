@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+dist/
+.npm
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Local MCP overrides (if needed)
+.vscode/mcp.json.local
