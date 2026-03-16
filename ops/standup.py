@@ -18,8 +18,22 @@ def build_coo_standup(graph_path: Path | str | None = None, today: date | None =
     """Return standup sections, including the scheduler block when overdue.
 
     The COO agent can join these sections with blank lines when rendering the
-    final standup message.  When nothing is overdue the scheduler block is
-    omitted.
+    final standup message.
+
+    Parameters
+    ----------
+    graph_path:
+        Optional path to ``knowledge-graph.jsonl``; defaults to the current
+        working directory's ``memory/`` folder.
+    today:
+        Optional reference date for overdue calculations; defaults to
+        ``date.today()`` when omitted.
+
+    Returns
+    -------
+    list[str]
+        Standup sections to render; empty when nothing is overdue so the caller
+        can skip the block entirely.
     """
     sections: list[str] = []
 
