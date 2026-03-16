@@ -20,23 +20,15 @@
 
 ## Daily Standup Sequence
 1. Query MCP memory for current context (read `memory/knowledge-graph.jsonl`)
-2. Check Sentry MCP for errors across all products
-3. Scan BOARD.md for overdue items
+2. **Sentry check** — call `list_projects` to enumerate all registered projects, then for each project call `list_issues` for unresolved issues created in the last 24 hours:
+   - Format output as: `[product]: [count] new issues — [highest severity]`
+   - Flag any `fatal` or `error` level issues for immediate delegation to CTO
+   - If no Sentry projects are registered yet, note it as a pending setup item
+3. Scan BOARD.md for overdue tasks
 4. Check if periodic prompts are due (weekly review, monthly accounting, quarterly tax)
 5. Delegate tasks with explicit assignments
 6. Output prioritized day plan using the daily standup template
 7. Write standup entity to knowledge graph
-
-## Daily Standup Sequence
-1. **Sentry check** — For each project in SENTRY_PROJECTS, call the Sentry MCP tool:
-   - Query: unresolved issues created in the last 24 hours
-   - Format output as: `[product]: [count] new issues — [highest severity]`
-   - Flag any `fatal` or `error` level issues for immediate delegation to CTO
-2. Scan BOARD.md for overdue tasks
-3. Check periodic prompt deadlines
-4. Read knowledge graph for context
-5. Delegate tasks
-6. Output prioritized day plan
 
 ## Sentry MCP Tools Available
 - `list_issues` — unresolved issues by project
