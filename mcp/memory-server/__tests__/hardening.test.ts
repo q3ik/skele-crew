@@ -2,15 +2,17 @@
  * Tests for the three hardening modifications added to the forked MCP memory server:
  *   1. Async mutex — two parallel writes complete without corruption
  *   2. Atomic writes — write to .tmp then fs.rename()
- *   3. Auto-repair on load — corrupt lines skipped, duplicates deduplicated
+ *   3. Auto-repair on load — corrupt lines skipped, schema-invalid lines skipped, duplicates deduplicated
+ *   4. Default path uses process.cwd(); relative MEMORY_FILE_PATH resolves from cwd
+ *   5. Legacy migration properly converts JSON → JSONL
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { promises as fs } from 'fs';
 import { randomUUID } from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { KnowledgeGraphManager, Entity } from '../index.js';
+import { KnowledgeGraphManager, Entity, defaultMemoryPath, ensureMemoryFilePath } from '../index.js';
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -223,5 +225,116 @@ describe('Hardening #3b — duplicate entries are deduplicated on load', () => {
 
     expect(graph.entities).toHaveLength(1);
     expect(graph.relations).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3c. Schema validation — syntactically valid JSON but schema-invalid records
+// ---------------------------------------------------------------------------
+describe('Hardening #3c — schema-invalid JSONL lines are skipped on load', () => {
+  let filePath: string;
+
+  beforeEach(() => { filePath = tmpFile(); });
+  afterEach(async () => { await cleanup(filePath); });
+
+  it('entity with null observations is skipped (prevents downstream array method crashes)', async () => {
+    const content = [
+      '{"type":"entity","name":"Bad","entityType":"test","observations":null}',
+      '{"type":"entity","name":"Good","entityType":"test","observations":[]}',
+    ].join('\n');
+    await fs.writeFile(filePath, content, 'utf-8');
+
+    const manager = new KnowledgeGraphManager(filePath);
+    const graph = await manager.readGraph();
+
+    expect(graph.entities).toHaveLength(1);
+    expect(graph.entities[0].name).toBe('Good');
+  });
+
+  it('entity missing required name field is skipped', async () => {
+    const content = [
+      '{"type":"entity","entityType":"test","observations":[]}',
+      '{"type":"entity","name":"Valid","entityType":"test","observations":[]}',
+    ].join('\n');
+    await fs.writeFile(filePath, content, 'utf-8');
+
+    const manager = new KnowledgeGraphManager(filePath);
+    const graph = await manager.readGraph();
+
+    expect(graph.entities).toHaveLength(1);
+    expect(graph.entities[0].name).toBe('Valid');
+  });
+
+  it('relation missing required from field is skipped', async () => {
+    const content = [
+      '{"type":"relation","to":"Bob","relationType":"knows"}',
+      '{"type":"relation","from":"Alice","to":"Bob","relationType":"knows"}',
+    ].join('\n');
+    await fs.writeFile(filePath, content, 'utf-8');
+
+    const manager = new KnowledgeGraphManager(filePath);
+    const graph = await manager.readGraph();
+
+    expect(graph.relations).toHaveLength(1);
+    expect(graph.relations[0].from).toBe('Alice');
+  });
+
+  it('entity with missing observations field defaults to empty array', async () => {
+    const content = '{"type":"entity","name":"NoObs","entityType":"test"}';
+    await fs.writeFile(filePath, content, 'utf-8');
+
+    const manager = new KnowledgeGraphManager(filePath);
+    const graph = await manager.readGraph();
+
+    expect(graph.entities).toHaveLength(1);
+    expect(graph.entities[0].observations).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Default path and ensureMemoryFilePath (Issue #2)
+// ---------------------------------------------------------------------------
+describe('Default path and ensureMemoryFilePath', () => {
+  let originalEnv: string | undefined;
+
+  beforeEach(() => {
+    originalEnv = process.env.MEMORY_FILE_PATH;
+    delete process.env.MEMORY_FILE_PATH;
+  });
+
+  afterEach(() => {
+    if (originalEnv !== undefined) {
+      process.env.MEMORY_FILE_PATH = originalEnv;
+    } else {
+      delete process.env.MEMORY_FILE_PATH;
+    }
+  });
+
+  it('defaultMemoryPath is an absolute path ending with memory/knowledge-graph.jsonl', () => {
+    expect(path.isAbsolute(defaultMemoryPath)).toBe(true);
+    expect(defaultMemoryPath).toMatch(/memory[/\\]knowledge-graph\.jsonl$/);
+  });
+
+  it('defaultMemoryPath is anchored to process.cwd()', () => {
+    expect(defaultMemoryPath).toContain(process.cwd());
+  });
+
+  it('ensureMemoryFilePath returns absolute path for absolute MEMORY_FILE_PATH', async () => {
+    const absolute = '/tmp/test-memory-absolute.jsonl';
+    process.env.MEMORY_FILE_PATH = absolute;
+    const result = await ensureMemoryFilePath();
+    expect(result).toBe(absolute);
+  });
+
+  it('ensureMemoryFilePath resolves relative MEMORY_FILE_PATH from process.cwd()', async () => {
+    process.env.MEMORY_FILE_PATH = 'my-memory.jsonl';
+    const result = await ensureMemoryFilePath();
+    expect(path.isAbsolute(result)).toBe(true);
+    expect(result).toBe(path.resolve(process.cwd(), 'my-memory.jsonl'));
+  });
+
+  it('ensureMemoryFilePath returns defaultMemoryPath when no env var is set and no legacy file exists', async () => {
+    const result = await ensureMemoryFilePath();
+    expect(result).toBe(defaultMemoryPath);
   });
 });

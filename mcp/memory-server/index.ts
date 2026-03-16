@@ -3,10 +3,15 @@
  * Hardened fork of @modelcontextprotocol/server-memory
  *
  * Modifications over the upstream source:
- *   1. Async mutex wraps saveGraph() — prevents concurrent write races.
+ *   1. Async mutex wraps the full read-modify-write cycle — prevents TOCTOU
+ *      races from concurrent agent tool calls.
  *   2. Atomic writes: write to a .tmp file then fs.rename() into place.
- *   3. Auto-repair on load: corrupt JSONL lines are skipped, duplicate
- *      entities/relations are deduplicated by (type, name|from) key.
+ *   3. Auto-repair on load: corrupt/schema-invalid JSONL lines are skipped,
+ *      duplicate entities/relations are deduplicated by (type, name|from) key.
+ *   4. Default path resolves to <cwd>/memory/knowledge-graph.jsonl so all
+ *      agents share the same graph regardless of where the package is installed.
+ *   5. Legacy JSON migration properly converts JSON → JSONL instead of blindly
+ *      renaming, preventing silent data loss.
  *
  * MCP protocol interfaces are unchanged.
  */
@@ -20,33 +25,137 @@ import { fileURLToPath } from 'url';
 import { Mutex } from 'async-mutex';
 
 // ---------------------------------------------------------------------------
-// Memory file path helpers (unchanged from upstream)
+// Internal Zod schemas for JSONL line validation during load
+// (separate from the MCP tool I/O schemas defined later)
 // ---------------------------------------------------------------------------
 
-export const defaultMemoryPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'memory.jsonl');
+const EntityLineSchema = z.object({
+  type: z.literal("entity"),
+  name: z.string(),
+  entityType: z.string(),
+  observations: z.array(z.string()).default([]),
+});
+
+const RelationLineSchema = z.object({
+  type: z.literal("relation"),
+  from: z.string(),
+  to: z.string(),
+  relationType: z.string(),
+});
+
+// ---------------------------------------------------------------------------
+// Memory file path helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Default memory path is anchored to process.cwd() so every agent process
+ * (regardless of where the package is installed) reads/writes the same shared
+ * graph at <repo-root>/memory/knowledge-graph.jsonl.
+ */
+export const defaultMemoryPath = path.resolve(process.cwd(), 'memory', 'knowledge-graph.jsonl');
+
+/**
+ * Write `content` to `destPath` atomically via a tmp file + rename.
+ */
+async function atomicWrite(destPath: string, content: string): Promise<void> {
+  const dir = path.dirname(destPath);
+  try {
+    await fs.mkdir(dir, { recursive: true });
+  } catch (err) {
+    throw new Error(`Failed to create directory ${dir}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  const tmpPath = `${destPath}.tmp`;
+  await fs.writeFile(tmpPath, content, 'utf-8');
+  await fs.rename(tmpPath, destPath);
+}
+
+/**
+ * Migrate a legacy `memory.json` to the new JSONL format at `newPath`.
+ *
+ * The legacy format was a single JSON object `{ entities: [...], relations: [...] }`.
+ * This function reads the file, detects its format, converts properly, and writes
+ * atomically.  If the format is unrecognised it throws rather than silently
+ * producing a corrupt JSONL file.
+ */
+async function migrateLegacyJson(oldPath: string, newPath: string): Promise<void> {
+  const content = await fs.readFile(oldPath, 'utf-8');
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new Error(
+      `Legacy file ${oldPath} is not valid JSON; cannot migrate safely. ` +
+      'Please manually migrate your data to JSONL format.'
+    );
+  }
+
+  if (
+    parsed !== null &&
+    typeof parsed === 'object' &&
+    !Array.isArray(parsed) &&
+    (Array.isArray((parsed as Record<string, unknown>)['entities']) ||
+     Array.isArray((parsed as Record<string, unknown>)['relations']))
+  ) {
+    // Legacy JSON object — validate and convert each entry to a JSONL line.
+    // Validation via the same Zod schemas used by loadGraph() ensures that
+    // malformed or prototype-polluting data is rejected before writing.
+    const obj = parsed as Record<string, unknown>;
+    const lines: string[] = [];
+    for (const e of (Array.isArray(obj['entities']) ? obj['entities'] : []) as unknown[]) {
+      const result = EntityLineSchema.safeParse({ type: 'entity', ...(e as object) });
+      if (result.success) {
+        lines.push(JSON.stringify(result.data));
+      } else {
+        console.error('[migration] Skipping invalid entity during legacy migration');
+      }
+    }
+    for (const r of (Array.isArray(obj['relations']) ? obj['relations'] : []) as unknown[]) {
+      const result = RelationLineSchema.safeParse({ type: 'relation', ...(r as object) });
+      if (result.success) {
+        lines.push(JSON.stringify(result.data));
+      } else {
+        console.error('[migration] Skipping invalid relation during legacy migration');
+      }
+    }
+    await atomicWrite(newPath, lines.join('\n'));
+    await fs.unlink(oldPath);
+    console.error('[migration] Successfully converted legacy memory.json to JSONL format');
+    return;
+  }
+
+  throw new Error(
+    `Legacy file ${oldPath} has an unexpected structure; cannot migrate safely. ` +
+    'Please manually migrate your data to JSONL format.'
+  );
+}
 
 export async function ensureMemoryFilePath(): Promise<string> {
   if (process.env.MEMORY_FILE_PATH) {
+    // Fix #2: resolve relative paths from process.cwd(), not the package directory
     return path.isAbsolute(process.env.MEMORY_FILE_PATH)
       ? process.env.MEMORY_FILE_PATH
-      : path.join(path.dirname(fileURLToPath(import.meta.url)), process.env.MEMORY_FILE_PATH);
+      : path.resolve(process.cwd(), process.env.MEMORY_FILE_PATH);
   }
 
-  const oldMemoryPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'memory.json');
   const newMemoryPath = defaultMemoryPath;
+  // Check for a legacy memory.json in the same directory as the new file
+  const oldMemoryPath = path.join(path.dirname(newMemoryPath), 'memory.json');
 
   try {
     await fs.access(oldMemoryPath);
     try {
       await fs.access(newMemoryPath);
+      // Both exist — use the new file; leave the old one for manual review
       return newMemoryPath;
     } catch {
-      console.error('DETECTED: Found legacy memory.json file, migrating to memory.jsonl for JSONL format compatibility');
-      await fs.rename(oldMemoryPath, newMemoryPath);
-      console.error('COMPLETED: Successfully migrated memory.json to memory.jsonl');
+      // Old exists, new does not — migrate
+      console.error('[migration] Found legacy memory.json file, migrating to JSONL format');
+      await migrateLegacyJson(oldMemoryPath, newMemoryPath);
       return newMemoryPath;
     }
   } catch {
+    // No legacy file — use new path
     return newMemoryPath;
   }
 }
@@ -87,7 +196,10 @@ export class KnowledgeGraphManager {
   // -------------------------------------------------------------------------
   // Hardening #3 — auto-repair on load
   //
-  // • Invalid JSON lines are silently skipped instead of throwing.
+  // • Invalid JSON lines are skipped.
+  // • Schema-invalid lines (valid JSON but missing/wrong-typed fields) are
+  //   also skipped via Zod safeParse — prevents downstream crashes in
+  //   searchNodes/addObservations when fields are null or wrong type.
   // • Duplicate entries (same type + name/from key) are deduplicated,
   //   keeping only the first occurrence (earliest in file).
   // -------------------------------------------------------------------------
@@ -100,46 +212,48 @@ export class KnowledgeGraphManager {
       const graph: KnowledgeGraph = { entities: [], relations: [] };
 
       for (const line of lines) {
-        let item: Record<string, unknown>;
+        // Step 1: parse JSON
+        let raw: unknown;
         try {
-          item = JSON.parse(line) as Record<string, unknown>;
+          raw = JSON.parse(line);
         } catch {
-          // Hardening #3a — skip corrupt lines; log only a length indicator to
-          // avoid exposing potentially sensitive content in logs.
+          // Hardening #3a — skip corrupt lines; log only byte count to avoid
+          // exposing potentially sensitive content.
           console.error(`[memory-server] Skipping corrupt JSONL line (${line.length} bytes)`);
           continue;
         }
 
-        // Hardening #3b — deduplicate
-        let dedupeKey: string | null;
-        if (item['type'] === 'entity') {
-          dedupeKey = `entity:${item['name']}`;
-        } else if (item['type'] === 'relation') {
-          dedupeKey = `relation:${item['from']}:${item['to']}:${item['relationType']}`;
-        } else {
-          dedupeKey = null;
-        }
-
-        if (dedupeKey !== null) {
-          if (seen.has(dedupeKey)) {
+        // Step 2: validate schema and deduplicate
+        if (raw !== null && typeof raw === 'object' && (raw as Record<string, unknown>)['type'] === 'entity') {
+          const parsed = EntityLineSchema.safeParse(raw);
+          if (!parsed.success) {
+            console.error(`[memory-server] Skipping schema-invalid entity line (${line.length} bytes)`);
             continue;
           }
+          const dedupeKey = `entity:${parsed.data.name}`;
+          if (seen.has(dedupeKey)) continue;
           seen.add(dedupeKey);
-        }
-
-        if (item['type'] === "entity") {
           graph.entities.push({
-            name: item['name'] as string,
-            entityType: item['entityType'] as string,
-            observations: item['observations'] as string[],
+            name: parsed.data.name,
+            entityType: parsed.data.entityType,
+            observations: parsed.data.observations,
           });
-        } else if (item['type'] === "relation") {
+        } else if (raw !== null && typeof raw === 'object' && (raw as Record<string, unknown>)['type'] === 'relation') {
+          const parsed = RelationLineSchema.safeParse(raw);
+          if (!parsed.success) {
+            console.error(`[memory-server] Skipping schema-invalid relation line (${line.length} bytes)`);
+            continue;
+          }
+          const dedupeKey = `relation:${parsed.data.from}:${parsed.data.to}:${parsed.data.relationType}`;
+          if (seen.has(dedupeKey)) continue;
+          seen.add(dedupeKey);
           graph.relations.push({
-            from: item['from'] as string,
-            to: item['to'] as string,
-            relationType: item['relationType'] as string,
+            from: parsed.data.from,
+            to: parsed.data.to,
+            relationType: parsed.data.relationType,
           });
         }
+        // Lines with unknown/missing type are silently ignored
       }
 
       return graph;
@@ -172,10 +286,9 @@ export class KnowledgeGraphManager {
         relationType: r.relationType,
       })),
     ];
-    // Hardening #2 — atomic write via tmp file + rename
-    const tmpPath = `${this.memoryFilePath}.tmp`;
-    await fs.writeFile(tmpPath, lines.join("\n"), "utf-8");
-    await fs.rename(tmpPath, this.memoryFilePath);
+    // Delegates to the module-level atomicWrite which also ensures the
+    // parent directory exists before writing.
+    await atomicWrite(this.memoryFilePath, lines.join("\n"));
   }
 
   // -------------------------------------------------------------------------
@@ -498,7 +611,21 @@ async function main() {
   console.error("Knowledge Graph MCP Server running on stdio");
 }
 
-main().catch((error) => {
-  console.error("Fatal error in main():", error);
-  process.exit(1);
-});
+// Issue #1 fix: only start the stdio server when this module is executed
+// directly as a CLI entry point (process.argv[1] points at this file).
+// Importing KnowledgeGraphManager in tests or other modules does NOT start
+// the server.
+//
+// Both paths are normalised before comparison to handle Windows path separator
+// and casing differences.
+const isMain =
+  process.argv[1] !== undefined &&
+  path.normalize(path.resolve(process.argv[1])) ===
+    path.normalize(fileURLToPath(import.meta.url));
+
+if (isMain) {
+  main().catch((error) => {
+    console.error("Fatal error in main():", error);
+    process.exit(1);
+  });
+}
