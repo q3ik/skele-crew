@@ -77,11 +77,15 @@ echo "$CHANGED_FILES" | sed 's/^/  /'
 echo ""
 
 # ---------------------------------------------------------------------------
-# CHECK 1 — Protected file diff
+# CHECK 1 — Protected section content diff (section-aware guardrail)
 #
-# Extract every file path listed under any protected_block's files: array,
-# read from the BASE BRANCH manifest to prevent policy weakening via PR edits.
-# Uses Python to parse the YAML without requiring yq.
+# For each (tag, file) pair in the manifest, extract the content of the
+# protected section delimited by <!-- PROTECTED: tag --> ... <!-- END PROTECTED: tag -->
+# from BOTH the base branch and the PR working tree, then compare.
+# Only fail if the section *content* changed — editing non-protected content
+# in a listed file is explicitly allowed.
+#
+# A flat PROTECTED_FILES list is also emitted below (still needed for CHECK 3).
 # ---------------------------------------------------------------------------
 PROTECTED_FILES=$(python3 - <<'PYEOF'
 import sys, re, os
@@ -121,15 +125,106 @@ echo ""
 
 VIOLATIONS=0
 
-while IFS= read -r protected_file; do
-  [ -z "$protected_file" ] && continue
-  if echo "$CHANGED_FILES" | grep -qF "$protected_file"; then
-    echo "❌ BLOCKED: Protected file modified directly: $protected_file"
-    echo "   Changes to this file require human approval and an audit trail."
-    echo "   Use PROPOSED_CHANGES.md to propose edits; do not commit directly."
-    VIOLATIONS=$((VIOLATIONS + 1))
-  fi
-done <<< "$PROTECTED_FILES"
+# Section-aware check: only block if protected section *content* changed.
+export _CHANGED_FILES="$CHANGED_FILES"
+export _BASE_REF="$BASE_REF"
+
+SECTION_VIOLATIONS=$(python3 - <<'PYEOF'
+import re, os, subprocess
+
+manifest_content = os.environ['_BASE_MANIFEST']
+changed_files = set(os.environ.get('_CHANGED_FILES', '').splitlines())
+base_ref = os.environ.get('_BASE_REF', 'main')
+
+# Parse manifest into [{tag, files}] blocks (reads from BASE branch manifest).
+blocks = []
+current_block = None
+in_files = False
+
+for line in manifest_content.splitlines():
+    stripped = line.strip()
+    if stripped.startswith('#'):
+        continue
+    m_tag = re.match(r'^-?\s*tag:\s+"?([^"]+)"?', stripped)
+    if m_tag:
+        if current_block is not None:
+            blocks.append(current_block)
+        current_block = {'tag': m_tag.group(1), 'files': []}
+        in_files = False
+        continue
+    if re.match(r'^files:', stripped):
+        in_files = True
+        continue
+    if in_files and re.match(r'^\S', stripped) and not stripped.startswith('-'):
+        in_files = False
+    if in_files and stripped.startswith('-'):
+        m = re.match(r'^-\s+"?([^"#\s]+)"?', stripped)
+        if m:
+            current_block['files'].append(m.group(1))
+
+if current_block is not None:
+    blocks.append(current_block)
+
+
+def extract_section(content, tag):
+    """Return the text from <!-- PROTECTED: tag --> to <!-- END PROTECTED: tag -->,
+    including the markers themselves.
+    Returns None if either marker is not found."""
+    start_marker = f'<!-- PROTECTED: {tag} -->'
+    end_marker = f'<!-- END PROTECTED: {tag} -->'
+    s = content.find(start_marker)
+    if s == -1:
+        return None
+    e = content.find(end_marker, s)
+    if e == -1:
+        return None
+    return content[s: e + len(end_marker)]
+
+
+violations = []
+
+for block in blocks:
+    tag = block['tag']
+    for filepath in block['files']:
+        if filepath not in changed_files:
+            continue
+
+        # Get protected section content from base branch.
+        try:
+            result = subprocess.run(
+                ['git', 'show', f'origin/{base_ref}:{filepath}'],
+                capture_output=True, text=True, check=False,
+            )
+            base_content = result.stdout if result.returncode == 0 else ''
+        except Exception:
+            base_content = ''
+
+        # Get protected section content from PR working tree.
+        try:
+            with open(filepath, encoding='utf-8') as f:
+                pr_content = f.read()
+        except OSError:
+            pr_content = ''
+
+        base_section = extract_section(base_content, tag)
+        pr_section = extract_section(pr_content, tag)
+
+        # Violation: section existed on base and was changed (or removed) in PR.
+        if base_section is not None and base_section != pr_section:
+            violations.append(f'{filepath} [tag: {tag}]')
+
+for v in violations:
+    print(v)
+PYEOF
+)
+
+while IFS= read -r violation; do
+  [ -z "$violation" ] && continue
+  echo "❌ BLOCKED: Protected section modified: $violation"
+  echo "   Changes to protected sections require human approval and an audit trail."
+  echo "   Use PROPOSED_CHANGES.md to propose edits; do not commit directly."
+  VIOLATIONS=$((VIOLATIONS + 1))
+done <<< "$SECTION_VIOLATIONS"
 
 # ---------------------------------------------------------------------------
 # CHECK 3 — Manifest weakening detection

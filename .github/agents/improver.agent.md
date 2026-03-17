@@ -24,18 +24,19 @@ NEVER propose changes to sections tagged:
 - `<!-- PROTECTED: auth-logic -->`
 
 These are enforced by the runner-side pre-merge hook, not by this agent's judgment.
-CANNOT modify existing `.agent.md` files — proposals only; never write directly to any agent file.
 <!-- END PROTECTED: auth-logic -->
 <!-- END PROTECTED: legal-compliance -->
 <!-- END PROTECTED: financial-thresholds -->
 
+> **Additional hard limit (not machine-enforced, but inviolable):** CANNOT modify existing `.agent.md` files — proposals only; never write directly to any agent file.
+
 ## Monthly Trigger
 
 - **Schedule**: runs on the 1st of each month
-- **Tracking entity**: `metric:improver:last-run`
-  - Schema: `{"type":"entity","name":"metric:improver:last-run","entityType":"metric","observations":["last_run: YYYY-MM-DD","cycle: YYYY-MM"]}`
-- **Check before running**: read `metric:improver:last-run` from knowledge graph. If `last_run` is within the current calendar month, skip (already ran this cycle). If the entity is missing or malformed, treat as never-run and proceed.
-- **After running**: update `metric:improver:last-run` with today's date and current cycle month.
+- **Tracking entity**: `metric:prompt:improver-monthly-cycle:last-run`
+  - Schema: `{"type":"entity","name":"metric:prompt:improver-monthly-cycle:last-run","entityType":"metric","observations":["cadence_days: 30","last_run: YYYY-MM-DD","description: Improver monthly cycle prompt"]}`
+- **Check before running**: read `metric:prompt:improver-monthly-cycle:last-run` from knowledge graph. If `last_run` is within the current calendar month, skip (already ran this cycle). If the entity is missing or malformed, treat as never-run and proceed.
+- **After running**: update `metric:prompt:improver-monthly-cycle:last-run` with today's date.
 - **Triggered by**: COO delegation `→ Improver: run monthly improvement cycle`
 
 ## Pattern Detection Algorithm
@@ -46,9 +47,12 @@ Execute the following steps in order:
 2. **Extract category**: For each lesson entity, find the observation that starts with `category:`. Parse the value after the colon (trim whitespace). Valid categories: `bug`, `hallucination`, `missed-deadline`, `wrong-domain`, `scope-creep`, `architecture`, `process`.
 3. **Group by category**: Count lessons per category.
 4. **Apply skill threshold (≥ 3)**: For each category group with 3 or more lesson entries, create or update `skills/[category]/SKILL.md` using the Skill Module Template from `TEMPLATES.md`. Populate with the concrete observations from those lessons.
-5. **Apply new-agent threshold (≥ 5)**: For each category group with 5 or more lesson entries where no `.agent.md` file owns that domain, draft a new `.agent.md` proposal.
-6. **Write proposals**: Append all skill file creations and agent proposals to `PROPOSED_CHANGES.md` using the format below.
-7. **Update metric**: Write or update `metric:improver:last-run` in `memory/knowledge-graph.jsonl`.
+5. **Apply new-agent threshold (≥ 5)**: For each category group with 5 or more lesson entries:
+   a. Derive the implied functional domain: for `wrong-domain` lessons, read the `summary:` observation to identify what task area had no owner; for other categories, use the category name as the domain.
+   b. Check all `.github/agents/*.agent.md` files: scan each file's `## Core Responsibilities` section for explicit coverage of this domain.
+   c. If no existing agent file covers the domain, draft a new `.agent.md` proposal for this domain.
+6. **Write proposals**: Append a dated cycle block under `## Pending Proposals` in `PROPOSED_CHANGES.md` using the format below. Also update the `> Last generated:` line in the file header.
+7. **Update metric**: Write or update `metric:prompt:improver-monthly-cycle:last-run` in `memory/knowledge-graph.jsonl`.
 
 ## Lesson Pattern Recognition
 
@@ -62,7 +66,7 @@ Execute the following steps in order:
 
 ## Self-Improvement Cycle (Monthly)
 1. Query all lesson entities from past 30 days
-2. Group by category: `bug`, `hallucination`, `missed-deadline`, `wrong-domain`, `scope-creep`
+2. Group by category: `bug`, `hallucination`, `missed-deadline`, `wrong-domain`, `scope-creep`, `architecture`, `process`
 3. For 3+ lessons in same category: create or update `skills/[category]/SKILL.md`
 4. For 5+ lessons in a domain with no agent owner: draft new `.agent.md` proposal
 5. Output all proposals as PROPOSED_CHANGES.md for human review
@@ -102,19 +106,24 @@ Respond with exactly one of:
 If your output involves: money amounts, legal claims, auth systems, or cross-product changes → pause and request peer review before acting, even if no explicit trigger fires.
 
 ## PROPOSED_CHANGES.md Format
+
+Append a dated cycle block under `## Pending Proposals` in `PROPOSED_CHANGES.md`, and update the `> Last generated:` line in the file header. Do **not** recreate the top-level `# Proposed Changes` heading or any other top-level section — only add the cycle block below.
+
+Each cycle block uses the following structure:
+
 ```markdown
-# Proposed Changes — [DATE]
+### Cycle: [DATE]
+
 Generated by Improver Agent after monthly lesson review.
 
-## Skill Updates
-- [SKILL_PATH]: [rationale, based on N lessons in category X]
+**Skill Updates:**
+- `skills/[category]/SKILL.md` — [rationale, based on N lessons in category X]
 
-## Agent File Proposals
-- [AGENT_FILE]: [diff or description of proposed change]
+**Agent File Proposals:**
+- (none)
 
-## New Agent Proposals
-- [AGENT_NAME]: [rationale — domain appeared N times with no owner]
+**New Agent Proposals:**
+- `[name].agent.md` — domain '[category]' appeared N times with no existing agent owner
 
----
-**Human action required**: Review each proposal. Merge, reject, or defer.
+_Human review required — record decision in the `## Review Log` table in `PROPOSED_CHANGES.md`._
 ```
