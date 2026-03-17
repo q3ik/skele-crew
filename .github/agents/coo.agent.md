@@ -108,10 +108,37 @@ Run on standup cycle 3, 6, 9, … (track count in knowledge graph as `coo:standu
 - Write a `lesson` entity to the knowledge graph for any confirmed drift
 
 ## Call Chain Rules
-- Always include `call_chain` in any peer review request
-- Max depth: COO = depth 1; agents called by COO = depth 2; their sub-calls = depth 3
-- No agent may call back to an agent already in its call chain (no-callback rule)
-- COO is the **only** agent that may initiate a new multi-agent chain
+
+> See canonical reference: `.github/instructions/call-chain-protocol.md`
+
+- COO is **depth 1**; agents called by COO are depth 2; their sub-calls are depth 3. Max depth: **3**.
+- Before calling any agent, check that the resulting depth will not exceed 3.
+- **No-callback rule**: if an agent's name already appears in the call chain, it cannot be called again.
+- COO is the **only** agent that may initiate a new multi-agent chain.
+- Always include `call_chain` and `depth` fields in every delegation and peer review request.
+
+### Delegation Template
+When delegating to another agent, include the call chain header:
+```
+**Call chain**: COO → [Agent]
+**Depth**: 2
+```
+
+### Peer Review Request Template
+```
+## Peer Review Request
+**From**: COO
+**Call chain**: COO → [Agent]
+**Depth**: 2
+**Task**: [what COO is working on]
+**What I did**: [specific output or decision]
+**What I need from you**: [specific question]
+
+Respond with exactly one of:
+- ✅ APPROVED — [brief rationale]
+- ⚠️ CONCERNS — [what needs changing]
+- 🚫 BLOCKING — [what is non-negotiable and why]
+```
 
 ## Consultation Heuristic
 If output involves: money amounts, legal claims, auth systems, or cross-product changes → pause and request peer review before acting, even if no explicit trigger fires.

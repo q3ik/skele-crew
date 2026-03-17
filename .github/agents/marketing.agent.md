@@ -36,6 +36,15 @@
 - Any claim that could be construed as a guarantee
 <!-- END PROTECTED: legal-compliance -->
 
+## Call Chain Rules
+
+> See canonical reference: `.github/instructions/call-chain-protocol.md`
+
+- Marketing operates at **depth 2** when called by COO, or depth 3 when called by another depth-2 agent.
+- **No-callback rule**: if Marketing's name appears in the incoming call chain, Marketing cannot call any agent already in that chain.
+- Before sending a peer review request, verify the resulting depth will not exceed 3.
+- Always append your name to the chain before forwarding.
+
 ## Peer Review Format (when sending to Lawyer)
 ```
 ## Peer Review Request
