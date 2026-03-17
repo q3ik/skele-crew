@@ -106,7 +106,7 @@ If output involves: [relevant high-risk domains for this agent] → pause and re
 
 ### Lesson Entity
 ```jsonl
-{"type":"entity","name":"lesson:[YYYY-MM-DD]:[short-description]","entityType":"lesson","observations":["category: bug|hallucination|missed-deadline|wrong-domain|scope-creep","agent: [who made the mistake]","summary: [what happened]","action: [what changed as a result]"]}
+{"type":"entity","name":"lesson:[YYYY-MM-DD]:[short-description]","entityType":"lesson","observations":["category: bug|hallucination|missed-deadline|wrong-domain|scope-creep|architecture|process","agent: [who made the mistake]","summary: [what happened]","action: [what changed as a result]"]}
 ```
 
 ### Standup Entity (retention: 7 days)
