@@ -313,6 +313,19 @@ export class KnowledgeGraphManager {
   // Public API — unchanged from upstream (backed by modifyGraph)
   // -------------------------------------------------------------------------
 
+  /**
+   * Run an arbitrary graph mutation atomically under the write mutex.
+   *
+   * The callback receives the current graph (already loaded) and may mutate
+   * it in-place.  The updated graph is then saved atomically.  This is the
+   * same contract as the private `modifyGraph` but exposed publicly so that
+   * external code (e.g. CitationTracker) can perform complex read-modify-write
+   * operations without TOCTOU races.
+   */
+  async updateGraph(fn: (graph: KnowledgeGraph) => void | Promise<void>): Promise<void> {
+    await this.modifyGraph(fn);
+  }
+
   async createEntities(entities: Entity[]): Promise<Entity[]> {
     return this.modifyGraph(graph => {
       const newEntities = entities.filter(e => !graph.entities.some(existing => existing.name === e.name));
@@ -431,105 +444,157 @@ export class KnowledgeGraphManager {
 // ---------------------------------------------------------------------------
 // Modification #6 — Citation tracking
 //
-// Records which entities are returned by each read tool call during a session.
-// At session end (SIGTERM / SIGINT) the accumulated counts are merged into a
-// monthly metric entity:
+// Records which entities are *cited* in agent responses during a session.
+// The workflow per session:
+//   1. Each read tool call buffers the returned entity names via recordRead().
+//   2. After the agent produces a response, the agent calls the
+//      record_citations MCP tool, which invokes recordCited(responseText).
+//      recordCited() checks which buffered entity names appear in the text
+//      and increments per-session citation counts for those matches only.
+//   3. At session end (SIGTERM / SIGINT) flush() atomically merges the
+//      per-session counts into the monthly metric entity.
 //
-//   metric:citation-tracking:[YYYY-MM]
-//
-// Observations format (matches the spec in docs/phase2-communication/README.md):
-//   "entity:<name>:cited:<count>"  — one per tracked entity
-//   "sessions_tracked:<N>"         — total sessions recorded in this month
-//   "last_updated:<YYYY-MM-DD>"    — date of last flush
-//
-// Entities that are never read accumulate cited:0.  After 30 sessions, any
-// entity with cited:0 can have its refresh interval extended to keep the
-// knowledge graph lean.
+// Metric entity format (matches docs/phase2-communication/README.md):
+//   "entity:<name>:cited:<count>"        — one per tracked entity
+//   "sessions_tracked:<N>"               — total sessions recorded this month
+//   "last_updated:<YYYY-MM-DD>"          — date of last flush
+//   "flagged_for_review:<name>"          — present after 30 sessions if cited:0
 // ---------------------------------------------------------------------------
 
 export class CitationTracker {
-  /** Per-session citation counts: entity name → read-hit count */
+  /** Entity names returned by read tools this session — used for citation matching */
+  private sessionReadBuffer = new Map<string, Entity>();
+  /** Confirmed per-session citation counts: entity name → count */
   private sessionCitations = new Map<string, number>();
 
-  /** Record entities returned by a read tool call this session */
+  /**
+   * Buffer entities returned by a read tool call.
+   * Does NOT increment citation counts — only marks entities as candidates
+   * for citation matching when recordCited() is later called.
+   */
   recordRead(entities: Entity[]): void {
     for (const entity of entities) {
-      // Skip the tracking metric itself to avoid self-referential inflation
+      // Never track the metric entity itself
       if (entity.name.startsWith('metric:citation-tracking:')) continue;
-      this.sessionCitations.set(
-        entity.name,
-        (this.sessionCitations.get(entity.name) ?? 0) + 1,
-      );
+      this.sessionReadBuffer.set(entity.name, entity);
     }
+  }
+
+  /**
+   * Match buffered entity names against the agent response text and record
+   * confirmed citations.  Call once per agent response (via the
+   * record_citations MCP tool) after the agent produces output.
+   *
+   * Returns the number of distinct entity names that were newly matched.
+   */
+  recordCited(responseText: string): number {
+    const lower = responseText.toLowerCase();
+    let matched = 0;
+    for (const name of this.sessionReadBuffer.keys()) {
+      if (lower.includes(name.toLowerCase())) {
+        this.sessionCitations.set(name, (this.sessionCitations.get(name) ?? 0) + 1);
+        matched++;
+      }
+    }
+    return matched;
   }
 
   /**
    * Flush per-session citation counts to the monthly metric entity.
    *
-   * Call once at end-of-session.  Reads the existing metric entity (if any),
-   * merges this session's counts into the cumulative totals, ensures every
-   * entity in the graph has a citation entry (defaulting to 0), then
-   * upserts the metric entity atomically via the manager's mutex.
+   * The entire read-parse-compute-write cycle runs inside a single
+   * `manager.updateGraph()` call, which holds the mutex for the full
+   * duration.  This prevents TOCTOU races when multiple flushes happen
+   * concurrently (e.g. two agents shutting down simultaneously).
+   *
+   * Call once at end-of-session.
    */
   async flush(manager: KnowledgeGraphManager): Promise<void> {
-    const yyyyMM = new Date().toISOString().slice(0, 7); // e.g. "2026-03"
+    // Capture a single timestamp so the month key and the date stamp are
+    // always consistent (fixes potential boundary split around midnight).
+    const now = new Date();
+    const yyyyMM = now.toISOString().slice(0, 7); // e.g. "2026-03"
+    const today  = now.toISOString().slice(0, 10); // e.g. "2026-03-17"
     const metricName = `metric:citation-tracking:${yyyyMM}`;
 
-    // Load a consistent snapshot of the full graph
-    const graph = await manager.readGraph();
+    // Snapshot session citations before entering the lock so that any
+    // recordCited() calls racing with flush() don't mutate the map mid-flight.
+    const sessionCitationsSnapshot = new Map(this.sessionCitations);
 
-    // Parse existing cumulative counts from the metric entity (if present)
-    const existing = graph.entities.find(e => e.name === metricName);
-    const cumulativeCounts = new Map<string, number>();
-    let sessionsTracked = 0;
+    await manager.updateGraph(graph => {
+      // -----------------------------------------------------------------
+      // Step 1: Parse existing cumulative counts from the metric entity
+      // -----------------------------------------------------------------
+      const existing = graph.entities.find(e => e.name === metricName);
+      const cumulativeCounts = new Map<string, number>();
+      let sessionsTracked = 0;
 
-    if (existing) {
-      for (const obs of existing.observations) {
-        const entityMatch = obs.match(/^entity:(.+):cited:(\d+)$/);
-        if (entityMatch) {
-          cumulativeCounts.set(entityMatch[1], parseInt(entityMatch[2], 10));
-          continue;
-        }
-        const sessionMatch = obs.match(/^sessions_tracked:(\d+)$/);
-        if (sessionMatch) {
-          sessionsTracked = parseInt(sessionMatch[1], 10);
+      if (existing) {
+        for (const obs of existing.observations) {
+          const entityMatch = obs.match(/^entity:(.+):cited:(\d+)$/);
+          if (entityMatch) {
+            cumulativeCounts.set(entityMatch[1], parseInt(entityMatch[2], 10));
+            continue;
+          }
+          const sessionMatch = obs.match(/^sessions_tracked:(\d+)$/);
+          if (sessionMatch) {
+            sessionsTracked = parseInt(sessionMatch[1], 10);
+          }
         }
       }
-    }
 
-    // Merge this session's citations into the cumulative totals
-    for (const [name, count] of this.sessionCitations) {
-      cumulativeCounts.set(name, (cumulativeCounts.get(name) ?? 0) + count);
-    }
-
-    // Ensure every entity in the graph has a citation entry (cited:0 baseline)
-    for (const entity of graph.entities) {
-      if (entity.name === metricName) continue;
-      if (!cumulativeCounts.has(entity.name)) {
-        cumulativeCounts.set(entity.name, 0);
+      // -----------------------------------------------------------------
+      // Step 2: Merge this session's citations into the cumulative totals
+      // -----------------------------------------------------------------
+      for (const [name, count] of sessionCitationsSnapshot) {
+        cumulativeCounts.set(name, (cumulativeCounts.get(name) ?? 0) + count);
       }
-    }
 
-    sessionsTracked += 1;
-    const today = new Date().toISOString().slice(0, 10); // e.g. "2026-03-17"
+      // -----------------------------------------------------------------
+      // Step 3: Ensure every non-metric entity has a cited:0 baseline
+      // -----------------------------------------------------------------
+      for (const entity of graph.entities) {
+        if (entity.name === metricName) continue;
+        if (entity.name.startsWith('metric:citation-tracking:')) continue;
+        if (!cumulativeCounts.has(entity.name)) {
+          cumulativeCounts.set(entity.name, 0);
+        }
+      }
 
-    const observations: string[] = [
-      ...Array.from(cumulativeCounts.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([name, count]) => `entity:${name}:cited:${count}`),
-      `sessions_tracked:${sessionsTracked}`,
-      `last_updated:${today}`,
-    ];
+      sessionsTracked += 1;
 
-    // Upsert: delete stale version then create fresh metric entity
-    if (existing) {
-      await manager.deleteEntities([metricName]);
-    }
-    await manager.createEntities([{
-      name: metricName,
-      entityType: 'metric',
-      observations,
-    }]);
+      // -----------------------------------------------------------------
+      // Step 4: Build observations array
+      // -----------------------------------------------------------------
+      const observations: string[] = [
+        ...Array.from(cumulativeCounts.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([name, count]) => `entity:${name}:cited:${count}`),
+        `sessions_tracked:${sessionsTracked}`,
+        `last_updated:${today}`,
+      ];
+
+      // Flag entities with zero citations for review after 30 sessions
+      if (sessionsTracked >= 30) {
+        for (const [name, count] of Array.from(cumulativeCounts.entries()).sort(([a], [b]) => a.localeCompare(b))) {
+          if (count === 0) {
+            observations.push(`flagged_for_review:${name}`);
+          }
+        }
+      }
+
+      // -----------------------------------------------------------------
+      // Step 5: Upsert the metric entity in-place (atomic, no separate
+      // deleteEntities + createEntities transactions)
+      // -----------------------------------------------------------------
+      const metricEntity: Entity = { name: metricName, entityType: 'metric', observations };
+      const idx = graph.entities.findIndex(e => e.name === metricName);
+      if (idx >= 0) {
+        graph.entities[idx] = metricEntity;
+      } else {
+        graph.entities.push(metricEntity);
+      }
+    });
   }
 }
 
@@ -726,6 +791,29 @@ server.registerTool(
     return {
       content: [{ type: "text" as const, text: JSON.stringify(graph, null, 2) }],
       structuredContent: { ...graph },
+    };
+  }
+);
+
+server.registerTool(
+  "record_citations",
+  {
+    title: "Record Citations",
+    description:
+      "Record which knowledge-graph entities appear in an agent response. " +
+      "Call once per agent response, passing the full response text. " +
+      "Only entity names that were returned by a prior read_graph / search_nodes / " +
+      "open_nodes call this session are eligible for citation matching.",
+    inputSchema: {
+      responseText: z.string().describe("The agent's full response text"),
+    },
+    outputSchema: { citedCount: z.number() },
+  },
+  async ({ responseText }) => {
+    const citedCount = citationTracker.recordCited(responseText);
+    return {
+      content: [{ type: "text" as const, text: `Recorded ${citedCount} citation(s) from response text` }],
+      structuredContent: { citedCount },
     };
   }
 );
