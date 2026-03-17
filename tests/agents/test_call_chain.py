@@ -1,9 +1,10 @@
 """
 Tests for inter-agent call-chain tracking protocol.
 
-Validates the two core safety rules:
-1. Max depth of 3 — a chain at depth 3 cannot call further agents.
-2. No-callback rule — an agent already in the chain cannot be called again.
+Validates the three core safety rules:
+1. COO-only initiation — only COO may start a new chain.
+2. Max depth of 3 — a chain at depth 3 cannot call further agents.
+3. No-callback rule — an agent already in the chain cannot be called again.
 
 These tests implement a minimal call-chain validator that mirrors the logic
 every agent is expected to apply before making a peer review request.
@@ -22,16 +23,24 @@ import pytest
 # ---------------------------------------------------------------------------
 
 MAX_DEPTH = 3
+INITIATOR = "COO"
 
 
 def can_call(chain: List[str], target: str) -> tuple[bool, str]:
     """Return (allowed, reason) for a proposed call from the end of *chain*
     to *target*.
 
-    Rules enforced:
-    - *target* must not already appear in *chain* (no-callback rule).
-    - Depth must not exceed MAX_DEPTH after the call.
+    Rules enforced (in priority order):
+    1. COO-only initiation: only COO may start a new (empty) chain.
+    2. No-callback rule: target must not already appear in the chain.
+    3. Max-depth rule: resulting depth must not exceed MAX_DEPTH.
     """
+    if not chain and target != INITIATOR:
+        return (
+            False,
+            f"coo-only: only {INITIATOR!r} may initiate a chain; "
+            f"{target!r} cannot start a new chain",
+        )
     if target in chain:
         return False, f"no-callback: {target!r} already appears in chain {chain!r}"
     new_depth = len(chain) + 1
@@ -49,7 +58,52 @@ def extend_chain(chain: List[str], next_agent: str) -> List[str]:
 
 
 # ---------------------------------------------------------------------------
-# 1. Max-depth tests
+# 1. COO-only initiation tests
+# ---------------------------------------------------------------------------
+
+class TestCOOOnlyInitiation:
+    def test_coo_can_initiate_chain(self) -> None:
+        """COO is permitted to start a new (empty) chain."""
+        chain: List[str] = []
+        allowed, _ = can_call(chain, "COO")
+        assert allowed
+
+    def test_non_coo_cannot_initiate_chain(self) -> None:
+        """A non-COO agent must not start a new chain."""
+        chain: List[str] = []
+        allowed, reason = can_call(chain, "Marketing")
+        assert not allowed
+        assert "coo-only" in reason
+
+    def test_accountant_cannot_initiate_chain(self) -> None:
+        chain: List[str] = []
+        allowed, reason = can_call(chain, "Accountant")
+        assert not allowed
+        assert "coo-only" in reason
+
+    def test_lawyer_cannot_initiate_chain(self) -> None:
+        chain: List[str] = []
+        allowed, reason = can_call(chain, "Lawyer")
+        assert not allowed
+        assert "coo-only" in reason
+
+    def test_initiation_error_names_the_blocked_agent(self) -> None:
+        chain: List[str] = []
+        _, reason = can_call(chain, "Marketing")
+        assert "Marketing" in reason
+
+    def test_extend_chain_raises_for_non_coo_initiation(self) -> None:
+        with pytest.raises(ValueError, match="coo-only"):
+            extend_chain([], "Marketing")
+
+    def test_coo_initiation_results_in_depth_1_chain(self) -> None:
+        chain = extend_chain([], "COO")
+        assert chain == ["COO"]
+        assert len(chain) == 1
+
+
+# ---------------------------------------------------------------------------
+# 2. Max-depth tests
 # ---------------------------------------------------------------------------
 
 class TestMaxDepth:
@@ -77,12 +131,6 @@ class TestMaxDepth:
         _, reason = can_call(chain, "Accountant")
         assert "4" in reason  # new_depth would be 4
 
-    def test_empty_chain_can_call_any_agent(self) -> None:
-        """An empty chain (depth 0 → 1) is always allowed."""
-        chain: List[str] = []
-        allowed, _ = can_call(chain, "COO")
-        assert allowed
-
     def test_extend_chain_raises_at_depth_4(self) -> None:
         chain = ["COO", "Marketing", "Lawyer"]
         with pytest.raises(ValueError, match="exceeds maximum"):
@@ -98,7 +146,7 @@ class TestMaxDepth:
 
 
 # ---------------------------------------------------------------------------
-# 2. No-callback rule tests
+# 3. No-callback rule tests
 # ---------------------------------------------------------------------------
 
 class TestNoCallbackRule:
@@ -141,14 +189,13 @@ class TestNoCallbackRule:
         assert "Marketing" in reason
 
     def test_callback_a_to_b_to_a(self) -> None:
-        """Simulate the canonical A → B → A callback scenario."""
-        # Step 1: A calls B — allowed
-        chain_ab: List[str] = []
-        chain_ab = extend_chain(chain_ab, "AgentA")
-        chain_ab = extend_chain(chain_ab, "AgentB")
+        """Simulate the canonical A → B → A callback scenario (COO initiates)."""
+        # COO initiates and calls Marketing
+        chain = extend_chain([], "COO")
+        chain = extend_chain(chain, "Marketing")
 
-        # Step 2: B tries to call A back — blocked
-        allowed, reason = can_call(chain_ab, "AgentA")
+        # Marketing tries to call COO back — blocked
+        allowed, reason = can_call(chain, "COO")
         assert not allowed
         assert "no-callback" in reason
 

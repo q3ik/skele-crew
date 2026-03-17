@@ -32,7 +32,7 @@ These are enforced by the runner-side pre-merge hook, not by this agent's judgme
 > See canonical reference: `.github/instructions/call-chain-protocol.md`
 
 - Improver operates at **depth 2** when called by COO.
-- **No-callback rule**: if Improver's name appears in the incoming call chain, Improver cannot call any agent already in that chain.
+- **No-callback rule**: do not call any agent whose name already appears in the current call chain.
 - Improver does not autonomously initiate multi-agent chains; all proposals go to `PROPOSED_CHANGES.md` for human review.
 
 ## Self-Improvement Cycle (Monthly)

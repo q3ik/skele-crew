@@ -9,8 +9,8 @@
 ## Peer Review Request
 
 **From**: Marketing
-**Call chain**: Marketing → Lawyer
-**Depth**: 1
+**Call chain**: COO → Marketing
+**Depth**: 2
 **Task**: Drafting a social media post for Buzzy Game to publish on Bluesky
 **What I did**: Drafted the following post containing a percentage/accuracy claim — "99% spelling accuracy across all grade levels" — which triggers mandatory Lawyer review per the Pre-Publish Checklist.
 

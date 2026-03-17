@@ -120,16 +120,16 @@ Run on standup cycle 3, 6, 9, … (track count in knowledge graph as `coo:standu
 ### Delegation Template
 When delegating to another agent, include the call chain header:
 ```
-**Call chain**: COO → [Agent]
-**Depth**: 2
+**Call chain**: COO
+**Depth**: 1
 ```
 
 ### Peer Review Request Template
 ```
 ## Peer Review Request
 **From**: COO
-**Call chain**: COO → [Agent]
-**Depth**: 2
+**Call chain**: COO
+**Depth**: 1
 **Task**: [what COO is working on]
 **What I did**: [specific output or decision]
 **What I need from you**: [specific question]
