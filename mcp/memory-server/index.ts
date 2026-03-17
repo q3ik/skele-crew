@@ -429,6 +429,114 @@ export class KnowledgeGraphManager {
 }
 
 // ---------------------------------------------------------------------------
+// Modification #6 — Citation tracking
+//
+// Records which entities are returned by each read tool call during a session.
+// At session end (SIGTERM / SIGINT) the accumulated counts are merged into a
+// monthly metric entity:
+//
+//   metric:citation-tracking:[YYYY-MM]
+//
+// Observations format (matches the spec in docs/phase2-communication/README.md):
+//   "entity:<name>:cited:<count>"  — one per tracked entity
+//   "sessions_tracked:<N>"         — total sessions recorded in this month
+//   "last_updated:<YYYY-MM-DD>"    — date of last flush
+//
+// Entities that are never read accumulate cited:0.  After 30 sessions, any
+// entity with cited:0 can have its refresh interval extended to keep the
+// knowledge graph lean.
+// ---------------------------------------------------------------------------
+
+export class CitationTracker {
+  /** Per-session citation counts: entity name → read-hit count */
+  private sessionCitations = new Map<string, number>();
+
+  /** Record entities returned by a read tool call this session */
+  recordRead(entities: Entity[]): void {
+    for (const entity of entities) {
+      // Skip the tracking metric itself to avoid self-referential inflation
+      if (entity.name.startsWith('metric:citation-tracking:')) continue;
+      this.sessionCitations.set(
+        entity.name,
+        (this.sessionCitations.get(entity.name) ?? 0) + 1,
+      );
+    }
+  }
+
+  /**
+   * Flush per-session citation counts to the monthly metric entity.
+   *
+   * Call once at end-of-session.  Reads the existing metric entity (if any),
+   * merges this session's counts into the cumulative totals, ensures every
+   * entity in the graph has a citation entry (defaulting to 0), then
+   * upserts the metric entity atomically via the manager's mutex.
+   */
+  async flush(manager: KnowledgeGraphManager): Promise<void> {
+    const yyyyMM = new Date().toISOString().slice(0, 7); // e.g. "2026-03"
+    const metricName = `metric:citation-tracking:${yyyyMM}`;
+
+    // Load a consistent snapshot of the full graph
+    const graph = await manager.readGraph();
+
+    // Parse existing cumulative counts from the metric entity (if present)
+    const existing = graph.entities.find(e => e.name === metricName);
+    const cumulativeCounts = new Map<string, number>();
+    let sessionsTracked = 0;
+
+    if (existing) {
+      for (const obs of existing.observations) {
+        const entityMatch = obs.match(/^entity:(.+):cited:(\d+)$/);
+        if (entityMatch) {
+          cumulativeCounts.set(entityMatch[1], parseInt(entityMatch[2], 10));
+          continue;
+        }
+        const sessionMatch = obs.match(/^sessions_tracked:(\d+)$/);
+        if (sessionMatch) {
+          sessionsTracked = parseInt(sessionMatch[1], 10);
+        }
+      }
+    }
+
+    // Merge this session's citations into the cumulative totals
+    for (const [name, count] of this.sessionCitations) {
+      cumulativeCounts.set(name, (cumulativeCounts.get(name) ?? 0) + count);
+    }
+
+    // Ensure every entity in the graph has a citation entry (cited:0 baseline)
+    for (const entity of graph.entities) {
+      if (entity.name === metricName) continue;
+      if (!cumulativeCounts.has(entity.name)) {
+        cumulativeCounts.set(entity.name, 0);
+      }
+    }
+
+    sessionsTracked += 1;
+    const today = new Date().toISOString().slice(0, 10); // e.g. "2026-03-17"
+
+    const observations: string[] = [
+      ...Array.from(cumulativeCounts.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([name, count]) => `entity:${name}:cited:${count}`),
+      `sessions_tracked:${sessionsTracked}`,
+      `last_updated:${today}`,
+    ];
+
+    // Upsert: delete stale version then create fresh metric entity
+    if (existing) {
+      await manager.deleteEntities([metricName]);
+    }
+    await manager.createEntities([{
+      name: metricName,
+      entityType: 'metric',
+      observations,
+    }]);
+  }
+}
+
+/** Module-level singleton used by the MCP tool handlers */
+const citationTracker = new CitationTracker();
+
+// ---------------------------------------------------------------------------
 // MCP server setup (unchanged from upstream)
 // ---------------------------------------------------------------------------
 
@@ -578,6 +686,7 @@ server.registerTool(
   },
   async () => {
     const graph = await knowledgeGraphManager.readGraph();
+    citationTracker.recordRead(graph.entities);
     return {
       content: [{ type: "text" as const, text: JSON.stringify(graph, null, 2) }],
       structuredContent: { ...graph },
@@ -595,6 +704,7 @@ server.registerTool(
   },
   async ({ query }) => {
     const graph = await knowledgeGraphManager.searchNodes(query);
+    citationTracker.recordRead(graph.entities);
     return {
       content: [{ type: "text" as const, text: JSON.stringify(graph, null, 2) }],
       structuredContent: { ...graph },
@@ -612,6 +722,7 @@ server.registerTool(
   },
   async ({ names }) => {
     const graph = await knowledgeGraphManager.openNodes(names);
+    citationTracker.recordRead(graph.entities);
     return {
       content: [{ type: "text" as const, text: JSON.stringify(graph, null, 2) }],
       structuredContent: { ...graph },
@@ -622,6 +733,25 @@ server.registerTool(
 async function main() {
   MEMORY_FILE_PATH = await ensureMemoryFilePath();
   knowledgeGraphManager = new KnowledgeGraphManager(MEMORY_FILE_PATH);
+
+  // Flush citation counts when the server is shut down gracefully.
+  // A guard prevents a double-flush if both SIGTERM and SIGINT arrive together.
+  let shuttingDown = false;
+  async function flushCitationsAndExit(signalName: string): Promise<void> {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.error(`[citation-tracking] ${signalName} received; flushing citation counts`);
+    try {
+      await citationTracker.flush(knowledgeGraphManager);
+      console.error('[citation-tracking] Flush complete');
+    } catch (err) {
+      console.error('[citation-tracking] Flush failed:', err instanceof Error ? err.message : String(err));
+    }
+    process.exit(0);
+  }
+
+  process.on('SIGTERM', () => { void flushCitationsAndExit('SIGTERM'); });
+  process.on('SIGINT',  () => { void flushCitationsAndExit('SIGINT'); });
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
