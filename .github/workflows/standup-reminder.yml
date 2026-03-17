@@ -41,21 +41,21 @@ jobs:
                   color: '0075ca',
                   description: 'Daily COO standup reminder',
                 });
+              } else {
+                throw e;
               }
             }
 
-            // Skip if an issue with this title already exists today
-            const existing = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: 'standup',
-              per_page: 10,
+            // Skip if an issue with this exact title already exists (open or closed)
+            // Use the search API to avoid per_page pagination limits.
+            const searchResult = await github.rest.search.issuesAndPullRequests({
+              q: `repo:${context.repo.owner}/${context.repo.repo} is:issue in:title "${title}"`,
+              per_page: 1,
             });
 
-            const duplicate = existing.data.find(i => i.title === title);
-            if (duplicate) {
-              console.log(`Standup issue already exists: #${duplicate.number}`);
+            if (searchResult.data.total_count > 0) {
+              const duplicate = searchResult.data.items[0];
+              console.log(`Standup issue already exists: #${duplicate.number} (${duplicate.state})`);
               return;
             }
 

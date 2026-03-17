@@ -124,14 +124,14 @@ When this agent mode is activated in GitHub Copilot, **immediately run the full 
    - DRIFT DETECTED — [agent] committed to [action] on [date], no output found
    ```
 
-7. **Write standup entity** — Append to `memory/knowledge-graph.jsonl`:
+7. **Write standup entity** — Append to `memory/knowledge-graph.jsonl` using the canonical schema from `TEMPLATES.md`:
    ```json
-   {"type":"entity","name":"standup:[YYYY-MM-DD]","entityType":"standup","observations":["sentry:buzzy-game:[count]:[severity]","overdue:[n]","delegated:[agent]:[task]"]}
+   {"type":"entity","name":"standup:[YYYY-MM-DD]","entityType":"standup","observations":["errors: [count]","overdue-tasks: [n]","delegations: [list]","priority-1: [task]"]}
    ```
 
-   > **Delegation field rule (Gap 3):** The `delegated` observation key **must always be present**:
-   > - If delegations were issued: one observation per delegation, e.g. `"delegated:Accountant:monthly financial summary"`
-   > - If no delegations were issued: write `"delegated:none"` explicitly — **never omit this key**
+   > **Delegation field rule (Gap 3):** The `delegations` observation key **must always be present**:
+   > - If delegations were issued: include each delegation in the value, e.g. `"delegations: Accountant:monthly financial summary, Improver:monthly cycle"`
+   > - If no delegations were issued: write `"delegations: none"` explicitly — **never omit this key**
    >
    > This ensures knowledge graph queries like "was anything delegated today?" are always reliable.
 

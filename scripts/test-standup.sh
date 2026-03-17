@@ -63,7 +63,9 @@ FAIL=0
 WARN=0
 
 # Delegation observation values that are considered empty / placeholder
-DELEGATION_PLACEHOLDER_RE='^(none|n/a|\[\]|\[list\])$'
+# Note: "none" is intentionally excluded — it is the canonical explicit value
+# written when no delegations were issued (Gap 3 requirement).
+DELEGATION_PLACEHOLDER_RE='^(n/a|\[\]|\[list\])$'
 
 pass() { echo "  ✅ PASS: $*"; PASS=$((PASS + 1)); }
 fail() { echo "  ❌ FAIL: $*" >&2; FAIL=$((FAIL + 1)); }

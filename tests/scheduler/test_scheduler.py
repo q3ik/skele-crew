@@ -386,17 +386,18 @@ class TestVerifyStandupEntity:
         self,
         graph_path: Path,
         date_str: str,
-        delegated: str = "none",
+        delegations: str = "none",
     ) -> None:
-        """Append a standup entity line to *graph_path*."""
+        """Append a standup entity line to *graph_path* using the canonical schema."""
         record = {
             "type": "entity",
             "name": f"standup:{date_str}",
             "entityType": "standup",
             "observations": [
-                "sentry:buzzy-game:0:none",
-                "overdue:0",
-                f"delegated:{delegated}",
+                "errors: 0",
+                "overdue-tasks: 0",
+                f"delegations: {delegations}",
+                "priority-1: none",
             ],
         }
         with graph_path.open("a", encoding="utf-8") as fh:
@@ -430,11 +431,11 @@ class TestVerifyStandupEntity:
 
         assert verify_standup_entity(graph_path=graph, today=today) is False
 
-    def test_returns_true_with_delegated_none_observation(self, tmp_path: Path) -> None:
-        """Gap 3: standup entity with explicit delegated:none is found correctly."""
+    def test_returns_true_with_delegations_none_observation(self, tmp_path: Path) -> None:
+        """Gap 3: standup entity with explicit 'delegations: none' is found correctly."""
         graph = tmp_path / "knowledge-graph.jsonl"
         today = date(2026, 3, 16)
-        self._write_standup_entity(graph, today.isoformat(), delegated="none")
+        self._write_standup_entity(graph, today.isoformat(), delegations="none")
 
         assert verify_standup_entity(graph_path=graph, today=today) is True
 
@@ -442,14 +443,14 @@ class TestVerifyStandupEntity:
         graph = tmp_path / "knowledge-graph.jsonl"
         today = date(2026, 3, 16)
 
-        # Mix corrupt line with a valid standup entity
+        # Mix corrupt line with a valid standup entity (canonical schema)
         with graph.open("w", encoding="utf-8") as fh:
             fh.write("THIS IS NOT JSON\n")
             fh.write(json.dumps({
                 "type": "entity",
                 "name": f"standup:{today.isoformat()}",
                 "entityType": "standup",
-                "observations": ["sentry:buzzy-game:0:none", "overdue:0", "delegated:none"],
+                "observations": ["errors: 0", "overdue-tasks: 0", "delegations: none", "priority-1: none"],
             }) + "\n")
 
         assert verify_standup_entity(graph_path=graph, today=today) is True
@@ -474,7 +475,7 @@ class TestVerifyStandupEntity:
                 "type": "entity",
                 "name": "standup:2026-03-16",
                 "entityType": "standup",
-                "observations": ["sentry:buzzy-game:0:none", "overdue:0", "delegated:none"],
+                "observations": ["errors: 0", "overdue-tasks: 0", "delegations: none", "priority-1: none"],
             }) + "\n")
 
         # Pass graph_path but no today — should resolve to fixed_date via monkeypatched today()

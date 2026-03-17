@@ -13,7 +13,12 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from ops.scheduler import _resolve_graph_path, format_standup_block
+from ops.scheduler import format_standup_block
+
+# Repo root resolved at import time, relative to this module's location.
+# This makes the default graph path deterministic regardless of the process's
+# working directory (fixes the cwd-dependent default documented in the function).
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def verify_standup_entity(
@@ -28,7 +33,9 @@ def verify_standup_entity(
     Parameters
     ----------
     graph_path:
-        Path to ``knowledge-graph.jsonl``.  Defaults to the repo-level file.
+        Path to ``knowledge-graph.jsonl``.  When omitted the function resolves
+        the path relative to the repository root (the parent directory of
+        ``ops/``), so it is **not** sensitive to the caller's working directory.
     today:
         Reference date.  Defaults to ``date.today()``.
 
@@ -38,7 +45,11 @@ def verify_standup_entity(
         ``True`` if a ``standup:YYYY-MM-DD`` entity for *today* is present;
         ``False`` otherwise.
     """
-    resolved_path = _resolve_graph_path(graph_path)
+    if graph_path is not None:
+        resolved_path = Path(graph_path)
+    else:
+        resolved_path = _REPO_ROOT / "memory" / "knowledge-graph.jsonl"
+
     ref_date = today if today is not None else date.today()
     entity_name = f"standup:{ref_date.isoformat()}"
 
