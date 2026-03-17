@@ -23,6 +23,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Mutex } from 'async-mutex';
+import { pruneGraph } from './pruning.js';
 
 // ---------------------------------------------------------------------------
 // Internal Zod schemas for JSONL line validation during load
@@ -846,6 +847,49 @@ server.registerTool(
     return {
       content: [{ type: "text" as const, text: `Recorded ${citedCount} citation(s) from response text` }],
       structuredContent: { citedCount },
+    };
+  }
+);
+
+server.registerTool(
+  "prune_graph",
+  {
+    title: "Prune Graph",
+    description:
+      "Apply retention rules to the knowledge graph: remove standup entities older than 7 days, " +
+      "archive metric entities older than 90 days (summary kept, per-entity detail dropped), " +
+      "and preserve lesson/decision/deadline entities permanently. " +
+      "Run weekly as part of the COO review.",
+    inputSchema: {},
+    outputSchema: {
+      removedCount: z.number().describe("Number of standup entities removed"),
+      archivedCount: z.number().describe("Number of metric entities archived"),
+      totalBefore: z.number().describe("Total entity count before pruning"),
+      totalAfter: z.number().describe("Total entity count after pruning"),
+    },
+  },
+  async () => {
+    let removedCount = 0;
+    let archivedCount = 0;
+    let totalBefore = 0;
+    let totalAfter = 0;
+
+    await knowledgeGraphManager.updateGraph(graph => {
+      totalBefore = graph.entities.length;
+      const result = pruneGraph(graph.entities, graph.relations, new Date());
+      removedCount = result.removedCount;
+      archivedCount = result.archivedCount;
+      graph.entities = result.entities;
+      graph.relations = result.relations;
+      totalAfter = graph.entities.length;
+    });
+
+    const summary =
+      `Pruned graph: ${removedCount} standup(s) removed, ${archivedCount} metric(s) archived. ` +
+      `Entities: ${totalBefore} → ${totalAfter}.`;
+    return {
+      content: [{ type: "text" as const, text: summary }],
+      structuredContent: { removedCount, archivedCount, totalBefore, totalAfter },
     };
   }
 );
