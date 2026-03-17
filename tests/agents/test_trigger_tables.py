@@ -158,48 +158,6 @@ class TestConsultationHeuristic:
         "marketing.agent.md",
         "accountant.agent.md",
     ])
-    def test_agent_heuristic_covers_money(self, agent_file: str) -> None:
-        content = _read_agent(agent_file)
-        heuristic_start = content.find("## Consultation Heuristic")
-        assert heuristic_start != -1
-        heuristic_text = content[heuristic_start:]
-        assert "money" in heuristic_text.lower(), (
-            f"{agent_file} consultation heuristic must mention money amounts"
-        )
-
-    @pytest.mark.parametrize("agent_file", [
-        "coo.agent.md",
-        "marketing.agent.md",
-        "accountant.agent.md",
-    ])
-    def test_agent_heuristic_covers_legal(self, agent_file: str) -> None:
-        content = _read_agent(agent_file)
-        heuristic_start = content.find("## Consultation Heuristic")
-        assert heuristic_start != -1
-        heuristic_text = content[heuristic_start:]
-        assert "legal" in heuristic_text.lower(), (
-            f"{agent_file} consultation heuristic must mention legal claims"
-        )
-
-    @pytest.mark.parametrize("agent_file", [
-        "coo.agent.md",
-        "marketing.agent.md",
-        "accountant.agent.md",
-    ])
-    def test_agent_heuristic_covers_cross_product(self, agent_file: str) -> None:
-        content = _read_agent(agent_file)
-        heuristic_start = content.find("## Consultation Heuristic")
-        assert heuristic_start != -1
-        heuristic_text = content[heuristic_start:]
-        assert "cross-product" in heuristic_text.lower(), (
-            f"{agent_file} consultation heuristic must mention cross-product changes"
-        )
-
-    @pytest.mark.parametrize("agent_file", [
-        "coo.agent.md",
-        "marketing.agent.md",
-        "accountant.agent.md",
-    ])
     def test_agent_heuristic_matches_canonical_text(self, agent_file: str) -> None:
         content = _read_agent(agent_file)
         # Find the heuristic section and extract the text on the next line.
