@@ -95,18 +95,40 @@ def _write_standup_entity(
     graph_path: Path,
     date_str: str,
     delegations: str = "none",
+    board_overdue: str = "",
 ) -> None:
-    """Append a standup entity to *graph_path*."""
+    """Append a standup entity to *graph_path*.
+
+    Parameters
+    ----------
+    graph_path:
+        Path to the knowledge graph JSONL file.
+    date_str:
+        ISO date string, e.g. ``"2026-03-15"``.
+    delegations:
+        Raw delegation value, e.g. ``"→ Marketing: write launch tweet"``.
+        Defaults to ``"none"`` (no delegations).
+    board_overdue:
+        Semicolon-separated list of overdue task names to embed as a
+        ``board-overdue:`` observation (BOARD.md snapshot).  Omit or pass
+        ``""`` to skip the observation (simulates older standup entities
+        that pre-date the board snapshot feature).
+    """
+    observations: list[str] = [
+        "errors: 0",
+        "overdue-tasks: 0",
+    ]
+    if board_overdue:
+        observations.append(f"board-overdue: {board_overdue}")
+    observations += [
+        f"delegations: {delegations}",
+        "priority-1: none",
+    ]
     record: dict[str, Any] = {
         "type": "entity",
         "name": f"standup:{date_str}",
         "entityType": "standup",
-        "observations": [
-            "errors: 0",
-            "overdue-tasks: 0",
-            f"delegations: {delegations}",
-            "priority-1: none",
-        ],
+        "observations": observations,
     }
     with graph_path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(record) + "\n")
@@ -170,7 +192,8 @@ class TestDriftDetected:
         )
 
     def test_drift_detected_output_format(self, tmp_path: Path) -> None:
-        """Output line must match the canonical DRIFT DETECTED format."""
+        """Output line must match the canonical DRIFT DETECTED format — no quotes
+        around the action, agent name in original case."""
         memory = tmp_path / "memory"
         memory.mkdir()
         graph = memory / "knowledge-graph.jsonl"
@@ -181,10 +204,24 @@ class TestDriftDetected:
 
         result = _run_check_drift(tmp_path)
         assert "DRIFT DETECTED" in result.stdout
-        # Must mention agent, action, and date
-        assert "marketing" in result.stdout.lower()
-        assert "write launch tweet" in result.stdout.lower()
-        assert "2026-03-15" in result.stdout  # committed_date = oldest of the 3
+
+        # Bug 3 fix: agent name preserved in original case (not lowercased)
+        assert "Marketing" in result.stdout
+
+        # Bug 1 fix: action must NOT be wrapped in single or double quotes
+        drift_line = next(
+            line for line in result.stdout.splitlines() if "DRIFT DETECTED" in line
+        )
+        assert "'write launch tweet'" not in drift_line, (
+            "Action should not be surrounded by single quotes"
+        )
+        assert '"write launch tweet"' not in drift_line, (
+            "Action should not be surrounded by double quotes"
+        )
+        assert "write launch tweet" in drift_line.lower()
+
+        # Date of the oldest standup
+        assert "2026-03-15" in result.stdout
 
     def test_drift_detected_no_output_found_phrase(self, tmp_path: Path) -> None:
         """Output must contain 'no output found'."""
@@ -448,7 +485,8 @@ class TestStandupCycleCounterEntity:
         )
         assert counter.get("entityType") == "metric"
 
-    def test_cycle_counter_has_count_observation(self) -> None:
+    def test_cycle_counter_has_cycle_count_observation(self) -> None:
+        """Bug 6 fix: observation key must be 'cycle-count:' matching the entity name."""
         graph_path = REPO_ROOT / "memory" / "knowledge-graph.jsonl"
         records = []
         for raw in graph_path.read_text(encoding="utf-8").splitlines():
@@ -465,9 +503,10 @@ class TestStandupCycleCounterEntity:
             None,
         )
         assert counter is not None
-        obs_text = " ".join(counter.get("observations", []))
-        assert "count:" in obs_text, (
-            "metric:coo:standup-cycle-count entity must have a 'count:' observation"
+        observations = counter.get("observations", [])
+        assert any(obs.startswith("cycle-count:") for obs in observations), (
+            "metric:coo:standup-cycle-count must have a 'cycle-count:' observation "
+            f"(found: {observations})"
         )
 
 
@@ -501,3 +540,234 @@ class TestScriptArguments:
             text=True,
         )
         assert result.returncode == 2
+
+
+# ---------------------------------------------------------------------------
+# 9. BOARD.md prerequisite enforcement (Bug 4)
+# ---------------------------------------------------------------------------
+
+
+class TestBoardMDPrereq:
+    def test_missing_board_file_exits_2(self, tmp_path: Path) -> None:
+        """Bug 4 fix: BOARD.md must exist; missing file exits with code 2."""
+        memory = tmp_path / "memory"
+        memory.mkdir()
+        graph = memory / "knowledge-graph.jsonl"
+        graph.write_text("", encoding="utf-8")
+        # No BOARD.md created
+
+        result = _run_check_drift(tmp_path)
+        assert result.returncode == 2, (
+            f"Expected exit 2 when BOARD.md is absent, got {result.returncode}.\n"
+            f"stderr: {result.stderr}"
+        )
+        assert "BOARD.md" in result.stderr
+
+    def test_board_file_present_allows_run(self, tmp_path: Path) -> None:
+        """When BOARD.md exists and there are <3 standups, script exits 0 (no drift)."""
+        memory = tmp_path / "memory"
+        memory.mkdir()
+        graph = memory / "knowledge-graph.jsonl"
+        graph.write_text("", encoding="utf-8")
+        _write_board(tmp_path)  # create BOARD.md
+
+        result = _run_check_drift(tmp_path)
+        assert result.returncode == 0
+
+
+# ---------------------------------------------------------------------------
+# 10. Board snapshot comparison (Bug 2)
+# ---------------------------------------------------------------------------
+
+
+class TestBoardSnapshotComparison:
+    """Tests for the board-overdue snapshot comparison drift signal.
+
+    When ALL 3 standup entities include a ``board-overdue:`` observation and the
+    same task appears in all three, drift is detected even if there are no
+    delegation carry-overs.
+    """
+
+    def test_board_snapshot_drift_detected_exit_code_1(self, tmp_path: Path) -> None:
+        """Task overdue in all 3 standup board snapshots → exit 1."""
+        memory = tmp_path / "memory"
+        memory.mkdir()
+        graph = memory / "knowledge-graph.jsonl"
+        _write_standup_entity(
+            graph, "2026-03-15", delegations="none", board_overdue="implement login"
+        )
+        _write_standup_entity(
+            graph, "2026-03-16", delegations="none", board_overdue="implement login"
+        )
+        _write_standup_entity(
+            graph, "2026-03-17", delegations="none", board_overdue="implement login"
+        )
+        _write_board(tmp_path)  # task NOT in completed section
+
+        result = _run_check_drift(tmp_path)
+        assert result.returncode == 1, (
+            f"Expected exit 1 (board snapshot drift), got {result.returncode}.\n"
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+
+    def test_board_snapshot_drift_output_contains_task(self, tmp_path: Path) -> None:
+        """DRIFT DETECTED line must mention the stale board task."""
+        memory = tmp_path / "memory"
+        memory.mkdir()
+        graph = memory / "knowledge-graph.jsonl"
+        _write_standup_entity(
+            graph, "2026-03-15", delegations="none", board_overdue="implement login"
+        )
+        _write_standup_entity(
+            graph, "2026-03-16", delegations="none", board_overdue="implement login"
+        )
+        _write_standup_entity(
+            graph, "2026-03-17", delegations="none", board_overdue="implement login"
+        )
+        _write_board(tmp_path)
+
+        result = _run_check_drift(tmp_path)
+        assert "DRIFT DETECTED" in result.stdout
+        assert "implement login" in result.stdout.lower()
+        assert "2026-03-15" in result.stdout
+
+    def test_board_snapshot_no_drift_if_task_in_completed(
+        self, tmp_path: Path
+    ) -> None:
+        """Task in board-overdue of all 3 standups but completed in BOARD.md → no drift."""
+        memory = tmp_path / "memory"
+        memory.mkdir()
+        graph = memory / "knowledge-graph.jsonl"
+        _write_standup_entity(
+            graph, "2026-03-15", delegations="none", board_overdue="implement login"
+        )
+        _write_standup_entity(
+            graph, "2026-03-16", delegations="none", board_overdue="implement login"
+        )
+        _write_standup_entity(
+            graph, "2026-03-17", delegations="none", board_overdue="implement login"
+        )
+        _write_board(tmp_path, completed_tasks=["implement login"])
+
+        result = _run_check_drift(tmp_path)
+        assert result.returncode == 0
+        assert "DRIFT DETECTED" not in result.stdout
+
+    def test_board_snapshot_no_drift_if_task_only_in_2_standups(
+        self, tmp_path: Path
+    ) -> None:
+        """Task in board-overdue of only 2 standups → not a 3-cycle carry-over."""
+        memory = tmp_path / "memory"
+        memory.mkdir()
+        graph = memory / "knowledge-graph.jsonl"
+        _write_standup_entity(
+            graph, "2026-03-15", delegations="none", board_overdue="implement login"
+        )
+        _write_standup_entity(
+            graph, "2026-03-16", delegations="none", board_overdue="implement login"
+        )
+        # Third standup has a different task
+        _write_standup_entity(
+            graph, "2026-03-17", delegations="none", board_overdue="fix pricing page"
+        )
+        _write_board(tmp_path)
+
+        result = _run_check_drift(tmp_path)
+        assert result.returncode == 0
+        assert "DRIFT DETECTED" not in result.stdout
+
+    def test_board_snapshot_skipped_when_not_all_standups_have_data(
+        self, tmp_path: Path
+    ) -> None:
+        """If only some standups have board-overdue data, the snapshot comparison
+        is skipped gracefully (no false positives)."""
+        memory = tmp_path / "memory"
+        memory.mkdir()
+        graph = memory / "knowledge-graph.jsonl"
+        # Only 2 of 3 standups have board-overdue observations
+        _write_standup_entity(
+            graph, "2026-03-15", delegations="none", board_overdue="implement login"
+        )
+        _write_standup_entity(
+            graph, "2026-03-16", delegations="none", board_overdue="implement login"
+        )
+        _write_standup_entity(
+            graph, "2026-03-17", delegations="none"  # no board_overdue
+        )
+        _write_board(tmp_path)
+
+        result = _run_check_drift(tmp_path)
+        assert result.returncode == 0
+        assert "DRIFT DETECTED" not in result.stdout
+
+    def test_board_snapshot_lesson_entity_written(self, tmp_path: Path) -> None:
+        """Drift via board snapshot must write a lesson entity."""
+        memory = tmp_path / "memory"
+        memory.mkdir()
+        graph = memory / "knowledge-graph.jsonl"
+        _write_standup_entity(
+            graph, "2026-03-15", delegations="none", board_overdue="implement login"
+        )
+        _write_standup_entity(
+            graph, "2026-03-16", delegations="none", board_overdue="implement login"
+        )
+        _write_standup_entity(
+            graph, "2026-03-17", delegations="none", board_overdue="implement login"
+        )
+        _write_board(tmp_path)
+
+        _run_check_drift(tmp_path)
+
+        lessons = _get_drift_lessons(tmp_path)
+        assert lessons, "Expected a drift lesson entity from board snapshot comparison"
+        obs_text = " ".join(lessons[-1].get("observations", []))
+        assert "missed-deadline" in obs_text
+        assert "implement login" in obs_text.lower()
+
+
+# ---------------------------------------------------------------------------
+# 11. Delegation format edge cases (Bug 3)
+# ---------------------------------------------------------------------------
+
+
+class TestDelegationFormatEdgeCases:
+    def test_markdown_list_prefix_stripped(self, tmp_path: Path) -> None:
+        """Bug 3 fix: delegations stored with '- → Agent: task' list prefix
+        must be parsed correctly."""
+        memory = tmp_path / "memory"
+        memory.mkdir()
+        graph = memory / "knowledge-graph.jsonl"
+        # Simulate COO writing markdown-style delegation list
+        _write_standup_entity(
+            graph, "2026-03-15", "- → Marketing: write launch tweet"
+        )
+        _write_standup_entity(
+            graph, "2026-03-16", "- → Marketing: write launch tweet"
+        )
+        _write_standup_entity(
+            graph, "2026-03-17", "- → Marketing: write launch tweet"
+        )
+        _write_board(tmp_path)
+
+        result = _run_check_drift(tmp_path)
+        assert result.returncode == 1
+        assert "DRIFT DETECTED" in result.stdout
+        assert "Marketing" in result.stdout
+        assert "write launch tweet" in result.stdout.lower()
+
+    def test_agent_name_preserved_in_original_case(self, tmp_path: Path) -> None:
+        """Bug 3 fix: agent name in drift report must match original capitalisation."""
+        memory = tmp_path / "memory"
+        memory.mkdir()
+        graph = memory / "knowledge-graph.jsonl"
+        _write_standup_entity(graph, "2026-03-15", "→ Accountant: file HST return")
+        _write_standup_entity(graph, "2026-03-16", "→ Accountant: file HST return")
+        _write_standup_entity(graph, "2026-03-17", "→ Accountant: file HST return")
+        _write_board(tmp_path)
+
+        result = _run_check_drift(tmp_path)
+        assert "Accountant" in result.stdout, (
+            "Agent name 'Accountant' must appear with original capitalisation; "
+            f"got: {result.stdout!r}"
+        )
+

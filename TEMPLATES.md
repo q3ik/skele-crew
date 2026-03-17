@@ -111,7 +111,7 @@ If output involves: [relevant high-risk domains for this agent] → pause and re
 
 ### Standup Entity (retention: 7 days)
 ```jsonl
-{"type":"entity","name":"standup:[YYYY-MM-DD]","entityType":"standup","observations":["errors: [count]","overdue-tasks: [count]","delegations: [list]","priority-1: [task]"]}
+{"type":"entity","name":"standup:[YYYY-MM-DD]","entityType":"standup","observations":["errors: [count]","overdue-tasks: [count]","board-overdue: [task1; task2]","delegations: [list]","priority-1: [task]"]}
 ```
 
 ### Retention Rules
