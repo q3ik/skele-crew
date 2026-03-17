@@ -72,6 +72,7 @@ npm test             # runs Vitest unit + hardening suites with coverage
 | `delete_relations` | Remove specific relations |
 | `read_graph` | Return the full knowledge graph |
 | `search_nodes` | Full-text search across entity names, types, and observations |
+| `list_entities_by_prefix` | Return all entities whose name starts with a namespace prefix (e.g. `product:buzzy-game`) — name-only match, never matches observation text |
 | `open_nodes` | Fetch specific entities by name |
 
 ## Knowledge graph file format

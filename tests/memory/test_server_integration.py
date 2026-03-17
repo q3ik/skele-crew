@@ -190,6 +190,62 @@ def test_create_relation(server: subprocess.Popen) -> None:
     assert any(r["from"] == "NodeA" and r["to"] == "NodeB" and r["relationType"] == "links_to" for r in relations)
 
 
+def test_namespace_isolation(server: subprocess.Popen) -> None:
+    """list_entities_by_prefix must return only entities whose name starts with the given prefix."""
+    send_mcp(
+        server,
+        "tools/call",
+        {"name": "create_entities", "arguments": {"entities": [
+            {"name": "product:buzzy-game", "entityType": "product", "observations": ["status: active"]},
+            {"name": "product:buzzy-game:feature:spelling-mode", "entityType": "feature", "observations": ["status: active"]},
+            {"name": "product:test-product-b", "entityType": "product", "observations": ["status: active", "see also: product:buzzy-game"]},
+            {"name": "product:test-product-b:feature:dashboard", "entityType": "feature", "observations": ["status: active"]},
+        ]}},
+        id=1,
+    )
+    response = send_mcp(
+        server,
+        "tools/call",
+        {"name": "list_entities_by_prefix", "arguments": {"prefix": "product:buzzy-game"}},
+        id=2,
+    )
+    graph = json.loads(response["result"]["content"][0]["text"])
+    names = {e["name"] for e in graph["entities"]}
+    assert "product:buzzy-game" in names
+    assert "product:buzzy-game:feature:spelling-mode" in names
+    assert "product:test-product-b" not in names
+    assert "product:test-product-b:feature:dashboard" not in names
+
+
+def test_cross_product_depends_on_relation(server: subprocess.Popen) -> None:
+    """A depends-on relation between two products must be stored and retrievable."""
+    send_mcp(
+        server,
+        "tools/call",
+        {"name": "create_entities", "arguments": {"entities": [
+            {"name": "product:buzzy-game", "entityType": "product", "observations": []},
+            {"name": "product:test-product-b", "entityType": "product", "observations": []},
+        ]}},
+        id=1,
+    )
+    send_mcp(
+        server,
+        "tools/call",
+        {"name": "create_relations", "arguments": {"relations": [
+            {"from": "product:test-product-b", "to": "product:buzzy-game", "relationType": "depends-on"},
+        ]}},
+        id=2,
+    )
+    response = send_mcp(server, "tools/call", {"name": "read_graph", "arguments": {}}, id=3)
+    graph = json.loads(response["result"]["content"][0]["text"])
+    assert any(
+        r["from"] == "product:test-product-b"
+        and r["to"] == "product:buzzy-game"
+        and r["relationType"] == "depends-on"
+        for r in graph["relations"]
+    )
+
+
 def test_concurrent_writes_no_data_loss(server: subprocess.Popen) -> None:
     """Fire 10 create_entities calls in parallel and assert all 10 entities are present."""
     lock = threading.Lock()

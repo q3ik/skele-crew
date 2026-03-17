@@ -70,6 +70,41 @@ If you haven't worked on this in a while:
 4. Run the COO standup to get oriented
 5. Pick up from where you left off
 
+## Knowledge Graph Namespacing
+
+Every entity in `memory/knowledge-graph.jsonl` must carry a namespace prefix that identifies its scope. This prevents agents working on different products from accidentally reading or overwriting each other's data.
+
+### Prefix Convention
+
+| Prefix | Scope | Example |
+|--------|-------|---------|
+| `product:[slug]:*` | Product-specific entities | `product:buzzy-game` |
+| `decision:[YYYY-MM-DD]:[desc]` | Company-wide decisions | `decision:2026-03-16:repo-initialized` |
+| `decision:[slug]:[YYYY-MM-DD]:[desc]` | Product-scoped decisions | `decision:buzzy-game:2026-04-01:pricing` |
+| `deadline:[YYYY-QX]:[desc]` | Company or tax deadlines | `deadline:2026-Q2:hst-filing` |
+| `lesson:[YYYY-MM-DD]:[desc]` | Company-wide lessons | `lesson:2026-03-16:start-with-three-agents` |
+| `lesson:[slug]:[YYYY-MM-DD]:[desc]` | Product-scoped lessons | `lesson:buzzy-game:2026-04-01:onboarding-flow` |
+| `system:[name]` | Infrastructure (not a product) | `system:skele-crew` |
+| `metric:prompt:[name]:last-run` | Scheduled-prompt tracking | `metric:prompt:weekly-review:last-run` |
+
+### Rules
+
+1. **Product entities** use `product:[slug]` as the root name and may have sub-entities using `product:[slug]:[sub-type]` (e.g. `product:buzzy-game:feature:spelling-mode`).
+2. **Product-scoped decisions/lessons** include the slug after the entity type prefix so a COO query for `product:buzzy-game:*` returns only buzzy-game data.
+3. **Cross-product relations** use the `depends-on` relation type and always reference fully-qualified entity names.
+
+### Cross-Product Relation Templates
+
+The following lines show the format for cross-product `depends-on` relations. Uncomment and fill in the slugs when a second product is added to the registry.
+
+```jsonl
+// Template — replace product:saas-b with the real slug and remove this comment line:
+// {"type":"relation","from":"product:buzzy-game","to":"product:saas-b","relationType":"depends-on"}
+// {"type":"relation","from":"product:saas-b","to":"product:buzzy-game","relationType":"depends-on"}
+```
+
+---
+
 ## Troubleshooting
 
 ### Memory corruption in knowledge-graph.jsonl
