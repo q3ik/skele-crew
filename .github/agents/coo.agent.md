@@ -183,5 +183,12 @@ Respond with exactly one of:
 - 🚫 BLOCKING — [what is non-negotiable and why]
 ```
 
+## Trigger Table
+
+| Trigger Condition | Must Consult |
+|---|---|
+| Legal compliance question | Lawyer |
+| Any cross-product impact | Self (do not delegate further) |
+
 ## Consultation Heuristic
-If output involves: money amounts, legal claims, auth systems, or cross-product changes → pause and request peer review before acting, even if no explicit trigger fires.
+If your output involves: money amounts, legal claims, auth systems, or cross-product changes → pause and request peer review before acting, even if no explicit trigger fires.

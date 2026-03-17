@@ -67,8 +67,14 @@ Respond with exactly one of:
 - Friday: Lessons learned or honest retrospective (dev.to article + Mastodon + Reddit with human review)
 - Product rotation: Buzzy Game → [next product when added]
 
+## Trigger Table
+
+| Trigger Condition | Must Consult |
+|---|---|
+| Any metric/accuracy claim | Lawyer |
+
 ## Consultation Heuristic
-If output involves: legal claims, financial metrics, competitive comparisons, accuracy claims, or user data → pause and request peer review from Lawyer before publishing.
+If your output involves: money amounts, legal claims, auth systems, or cross-product changes → pause and request peer review before acting, even if no explicit trigger fires.
 
 ## Self-Check Scenarios
 - Post with a metric/percentage/accuracy claim → trigger Lawyer review before publish
