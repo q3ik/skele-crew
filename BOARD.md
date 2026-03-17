@@ -35,5 +35,5 @@
 |--------|-----------|----------|----------|
 | Weekly review | Weekly | — | 2026-03-23 |
 | Monthly accounting | Monthly | — | 2026-04-01 |
-| Quarterly tax summary | Quarterly | — | 2026-04-01 |
+| Quarterly HST filing | Quarterly | — | 2026-04-01 |
 | Improver monthly cycle | Monthly | — | 2026-04-01 |
