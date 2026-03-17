@@ -57,11 +57,13 @@ describe('AC1 — clean load of valid JSONL', () => {
     expect(graph.entities).toHaveLength(2);
     expect(graph.relations).toHaveLength(1);
 
-    const names = graph.entities.map(e => e.name);
-    expect(names).toContain('product:alpha');
-    expect(names).toContain('lesson:test-first');
-    expect(graph.entities.find(e => e.name === 'product:alpha')?.observations).toEqual(['status:active']);
-    expect(graph.relations[0]).toMatchObject({ from: 'product:alpha', to: 'lesson:test-first', relationType: 'guided-by' });
+    expect(graph.entities).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'product:alpha', entityType: 'product', observations: ['status:active'] }),
+      expect.objectContaining({ name: 'lesson:test-first', entityType: 'lesson', observations: ['always write tests'] }),
+    ]));
+    expect(graph.relations).toEqual([
+      expect.objectContaining({ from: 'product:alpha', to: 'lesson:test-first', relationType: 'guided-by' }),
+    ]);
   });
 });
 
@@ -179,8 +181,13 @@ describe('AC4 — atomic write: file content is correct after save', () => {
     const parsed = lines.map(l => JSON.parse(l));
     const entityLines = parsed.filter((l: { type: string }) => l.type === 'entity');
     const relationLines = parsed.filter((l: { type: string }) => l.type === 'relation');
-    expect(entityLines).toHaveLength(2);
-    expect(relationLines).toHaveLength(1);
+    expect(entityLines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'entity-one', observations: ['obs-1'] }),
+      expect.objectContaining({ name: 'entity-two', observations: ['obs-2'] }),
+    ]));
+    expect(relationLines).toEqual([
+      expect.objectContaining({ from: 'entity-one', to: 'entity-two', relationType: 'links-to' }),
+    ]);
 
     // No stale .tmp file left behind
     const tmpExists = await fs.access(`${filePath}.tmp`).then(() => true).catch(() => false);
