@@ -202,7 +202,13 @@ class TestConsultationHeuristic:
     ])
     def test_agent_heuristic_matches_canonical_text(self, agent_file: str) -> None:
         content = _read_agent(agent_file)
-        assert CANONICAL_HEURISTIC in content, (
-            f"{agent_file} consultation heuristic does not match the canonical text from "
-            "docs/phase2-communication/README.md"
+        # Find the heuristic section and extract the text on the next line.
+        match = re.search(r"## Consultation Heuristic\s*\n([^\n]+)", content)
+        assert match, f"{agent_file} could not find '## Consultation Heuristic' section text"
+
+        heuristic_text = match.group(1).strip()
+        assert heuristic_text == CANONICAL_HEURISTIC, (
+            f"{agent_file} consultation heuristic does not match the canonical text.\n"
+            f"  Expected: '{CANONICAL_HEURISTIC}'\n"
+            f"  Got:      '{heuristic_text}'"
         )
