@@ -191,14 +191,14 @@ def test_create_relation(server: subprocess.Popen) -> None:
 
 
 def test_namespace_isolation(server: subprocess.Popen) -> None:
-    """COO querying product:buzzy-game:* entities must not receive product:test-product-b:* entities."""
+    """list_entities_by_prefix must return only entities whose name starts with the given prefix."""
     send_mcp(
         server,
         "tools/call",
         {"name": "create_entities", "arguments": {"entities": [
             {"name": "product:buzzy-game", "entityType": "product", "observations": ["status: active"]},
             {"name": "product:buzzy-game:feature:spelling-mode", "entityType": "feature", "observations": ["status: active"]},
-            {"name": "product:test-product-b", "entityType": "product", "observations": ["status: active"]},
+            {"name": "product:test-product-b", "entityType": "product", "observations": ["status: active", "see also: product:buzzy-game"]},
             {"name": "product:test-product-b:feature:dashboard", "entityType": "feature", "observations": ["status: active"]},
         ]}},
         id=1,
@@ -206,7 +206,7 @@ def test_namespace_isolation(server: subprocess.Popen) -> None:
     response = send_mcp(
         server,
         "tools/call",
-        {"name": "search_nodes", "arguments": {"query": "product:buzzy-game"}},
+        {"name": "list_entities_by_prefix", "arguments": {"prefix": "product:buzzy-game"}},
         id=2,
     )
     graph = json.loads(response["result"]["content"][0]["text"])

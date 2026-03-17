@@ -83,6 +83,7 @@ Every entity in `memory/knowledge-graph.jsonl` must carry a namespace prefix tha
 | `decision:[slug]:[YYYY-MM-DD]:[desc]` | Product-scoped decisions | `decision:buzzy-game:2026-04-01:pricing` |
 | `deadline:[YYYY-QX]:[desc]` | Company or tax deadlines | `deadline:2026-Q2:hst-filing` |
 | `lesson:[YYYY-MM-DD]:[desc]` | Company-wide lessons | `lesson:2026-03-16:start-with-three-agents` |
+| `lesson:[slug]:[YYYY-MM-DD]:[desc]` | Product-scoped lessons | `lesson:buzzy-game:2026-04-01:onboarding-flow` |
 | `system:[name]` | Infrastructure (not a product) | `system:skele-crew` |
 | `metric:prompt:[name]:last-run` | Scheduled-prompt tracking | `metric:prompt:weekly-review:last-run` |
 

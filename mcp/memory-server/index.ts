@@ -412,6 +412,21 @@ export class KnowledgeGraphManager {
     });
   }
 
+  async listEntitiesByPrefix(prefix: string): Promise<KnowledgeGraph> {
+    return this.writeMutex.runExclusive(async () => {
+      const graph = await this.loadGraph();
+
+      const filteredEntities = graph.entities.filter(e => e.name.startsWith(prefix));
+      const filteredEntityNames = new Set(filteredEntities.map(e => e.name));
+
+      const filteredRelations = graph.relations.filter(r =>
+        filteredEntityNames.has(r.from) || filteredEntityNames.has(r.to)
+      );
+
+      return { entities: filteredEntities, relations: filteredRelations };
+    });
+  }
+
   async openNodes(names: string[]): Promise<KnowledgeGraph> {
     return this.writeMutex.runExclusive(async () => {
       const graph = await this.loadGraph();
@@ -595,6 +610,23 @@ server.registerTool(
   },
   async ({ query }) => {
     const graph = await knowledgeGraphManager.searchNodes(query);
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify(graph, null, 2) }],
+      structuredContent: { ...graph },
+    };
+  }
+);
+
+server.registerTool(
+  "list_entities_by_prefix",
+  {
+    title: "List Entities By Prefix",
+    description: "Return all entities whose name starts with the given namespace prefix (e.g. 'product:buzzy-game'). Unlike search_nodes, this matches only entity names and never observation text, so results are strictly scoped to the requested namespace.",
+    inputSchema: { prefix: z.string().describe("The namespace prefix to filter by, e.g. 'product:buzzy-game'") },
+    outputSchema: { entities: z.array(EntitySchema), relations: z.array(RelationSchema) },
+  },
+  async ({ prefix }) => {
+    const graph = await knowledgeGraphManager.listEntitiesByPrefix(prefix);
     return {
       content: [{ type: "text" as const, text: JSON.stringify(graph, null, 2) }],
       structuredContent: { ...graph },

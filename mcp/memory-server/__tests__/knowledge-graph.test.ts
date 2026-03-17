@@ -203,6 +203,49 @@ describe('KnowledgeGraphManager', () => {
     });
   });
 
+  describe('listEntitiesByPrefix', () => {
+    beforeEach(async () => {
+      await manager.createEntities([
+        { name: 'product:buzzy-game', entityType: 'product', observations: ['status: active'] },
+        { name: 'product:buzzy-game:feature:spelling-mode', entityType: 'feature', observations: [] },
+        { name: 'product:other-app', entityType: 'product', observations: ['see also: product:buzzy-game'] },
+        { name: 'product:other-app:feature:dashboard', entityType: 'feature', observations: [] },
+      ]);
+      await manager.createRelations([
+        { from: 'product:buzzy-game', to: 'product:other-app', relationType: 'depends-on' },
+      ]);
+    });
+
+    it('should return only entities whose name starts with the prefix', async () => {
+      const result = await manager.listEntitiesByPrefix('product:buzzy-game');
+      const names = result.entities.map(e => e.name);
+      expect(names).toContain('product:buzzy-game');
+      expect(names).toContain('product:buzzy-game:feature:spelling-mode');
+      expect(names).not.toContain('product:other-app');
+      expect(names).not.toContain('product:other-app:feature:dashboard');
+    });
+
+    it('should not match by observation content', async () => {
+      // 'product:other-app' has an observation mentioning 'product:buzzy-game',
+      // but listEntitiesByPrefix must not return it.
+      const result = await manager.listEntitiesByPrefix('product:buzzy-game');
+      const names = result.entities.map(e => e.name);
+      expect(names).not.toContain('product:other-app');
+    });
+
+    it('should include relations where at least one endpoint matches the prefix', async () => {
+      const result = await manager.listEntitiesByPrefix('product:buzzy-game');
+      expect(result.relations).toHaveLength(1);
+      expect(result.relations[0].from).toBe('product:buzzy-game');
+    });
+
+    it('should return empty graph for an unrecognised prefix', async () => {
+      const result = await manager.listEntitiesByPrefix('product:nonexistent');
+      expect(result.entities).toHaveLength(0);
+      expect(result.relations).toHaveLength(0);
+    });
+  });
+
   describe('openNodes', () => {
     beforeEach(async () => {
       await manager.createEntities([
