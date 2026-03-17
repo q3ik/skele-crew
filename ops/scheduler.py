@@ -6,11 +6,12 @@ Stores last-run dates as ``metric:prompt:<name>:last-run`` entities in
 and calls :func:`check_overdue` to surface any prompts that are past their
 cadence deadline.
 
-Three tracked prompts
----------------------
-* ``weekly-review``     — 7-day cadence
-* ``monthly-accounting`` — 30-day cadence
-* ``quarterly-hst``     — 90-day cadence
+Four tracked prompts
+--------------------
+* ``weekly-review``        — 7-day cadence
+* ``monthly-accounting``   — 30-day cadence
+* ``quarterly-hst``        — 90-day cadence
+* ``improver-monthly-cycle`` — 30-day cadence
 
 Entity format (observations list)
 ----------------------------------
@@ -50,6 +51,7 @@ PROMPTS: dict[str, int] = {
     "weekly-review": 7,
     "monthly-accounting": 30,
     "quarterly-hst": 90,
+    "improver-monthly-cycle": 30,
 }
 
 def _default_graph_path() -> Path:

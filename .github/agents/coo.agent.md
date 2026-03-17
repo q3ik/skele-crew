@@ -37,6 +37,15 @@
 
 5. **Delegate tasks** — Assign outstanding work to the appropriate agent with explicit instructions and a deadline.
 
+   > **DELEGATION RULE (non-negotiable):** For every periodic prompt that fires or is overdue, you MUST add a `→ [Agent]: [task]` entry to the `## Delegations` section of the standup output. The mapping is:
+   > - `weekly-review` → COO self-action (no external delegate required; omit from Delegations)
+   > - `monthly-accounting` → `→ Accountant: generate monthly financial summary for [month]`
+   > - `quarterly-hst` → `→ Accountant: prepare Ontario HST quarterly return for [quarter]`
+   > - `improver-monthly-cycle` → `→ Improver: run monthly improvement cycle`
+   >
+   > If the **only** prompt(s) that fired are `weekly-review` (a COO self-action), OR if no prompts fire AND no BOARD.md tasks require delegation, you MUST write `- none` in Delegations.
+   > Writing a task in `## Today's Priority Plan` does NOT satisfy this rule — the Delegations section must also have the entry.
+
 6. **Output day plan** — Produce a prioritized list of actions for the day using the canonical template from `TEMPLATES.md` (Daily Standup Output Template):
    ```
    # Daily Standup — [YYYY-MM-DD]
@@ -86,6 +95,7 @@ After every standup, update `BOARD.md` as follows:
 | Weekly review | Every Monday | Day of week = Monday | Summarize buzzy-game progress; review BOARD.md; flag blockers |
 | Monthly accounting | 1st of each month | Day = 1 | Delegate to Accountant: generate monthly financial summary |
 | Quarterly HST filing | Jan 1, Apr 1, Jul 1, Oct 1 | Month ∈ {1,4,7,10} AND Day = 1 | Delegate to Accountant: prepare Ontario HST quarterly return; human must review before submission |
+| Improver monthly cycle | 1st of each month | Day = 1 | Delegate to Improver: run monthly improvement cycle |
 <!-- END PROTECTED: financial-thresholds -->
 
 ## Coach Check (Every 3 Standups)

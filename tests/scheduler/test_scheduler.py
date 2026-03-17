@@ -51,13 +51,19 @@ def _write_metric_entity(
 # ---------------------------------------------------------------------------
 
 class TestPromptsRegistry:
-    def test_three_prompts_defined(self) -> None:
-        assert set(PROMPTS.keys()) == {"weekly-review", "monthly-accounting", "quarterly-hst"}
+    def test_four_prompts_defined(self) -> None:
+        assert set(PROMPTS.keys()) == {
+            "weekly-review",
+            "monthly-accounting",
+            "quarterly-hst",
+            "improver-monthly-cycle",
+        }
 
     def test_cadences_are_correct(self) -> None:
         assert PROMPTS["weekly-review"] == 7
         assert PROMPTS["monthly-accounting"] == 30
         assert PROMPTS["quarterly-hst"] == 90
+        assert PROMPTS["improver-monthly-cycle"] == 30
 
 
 # ---------------------------------------------------------------------------
@@ -100,11 +106,12 @@ class TestCheckOverdueDetection:
         today = date(2026, 3, 16)
         last_run = today - timedelta(days=7)  # due exactly today
 
-        # Seed all three prompts so only weekly-review is on its due date;
-        # the other two are up to date (ran today).
+        # Seed all four prompts so only weekly-review is on its due date;
+        # the other three are up to date (ran today).
         _write_metric_entity(graph, "weekly-review", last_run.isoformat(), 7)
         _write_metric_entity(graph, "monthly-accounting", today.isoformat(), 30)
         _write_metric_entity(graph, "quarterly-hst", today.isoformat(), 90)
+        _write_metric_entity(graph, "improver-monthly-cycle", today.isoformat(), 30)
 
         result = check_overdue(graph_path=graph, today=today)
         assert len(result) == 1
@@ -148,7 +155,7 @@ class TestCheckOverdueDetection:
         item = next(r for r in result if r["slug"] == "monthly-accounting")
         assert item["overdue_days"] == 9
 
-    def test_all_three_overdue_at_once(self, tmp_path: Path) -> None:
+    def test_all_four_overdue_at_once(self, tmp_path: Path) -> None:
         graph = tmp_path / "knowledge-graph.jsonl"
         today = date(2026, 3, 16)
 
@@ -156,10 +163,16 @@ class TestCheckOverdueDetection:
         _write_metric_entity(graph, "weekly-review", "2026-01-01", 7)
         _write_metric_entity(graph, "monthly-accounting", "2026-01-01", 30)
         _write_metric_entity(graph, "quarterly-hst", "2025-01-01", 90)
+        _write_metric_entity(graph, "improver-monthly-cycle", "2026-01-01", 30)
 
         result = check_overdue(graph_path=graph, today=today)
         slugs = {r["slug"] for r in result}
-        assert slugs == {"weekly-review", "monthly-accounting", "quarterly-hst"}
+        assert slugs == {
+            "weekly-review",
+            "monthly-accounting",
+            "quarterly-hst",
+            "improver-monthly-cycle",
+        }
 
     def test_only_overdue_prompts_returned_when_mixed(self, tmp_path: Path) -> None:
         graph = tmp_path / "knowledge-graph.jsonl"
@@ -171,10 +184,28 @@ class TestCheckOverdueDetection:
         _write_metric_entity(graph, "monthly-accounting", (today - timedelta(days=40)).isoformat(), 30)
         # quarterly-hst: up to date (ran 1 day ago)
         _write_metric_entity(graph, "quarterly-hst", (today - timedelta(days=1)).isoformat(), 90)
+        # improver-monthly-cycle: up to date (ran today)
+        _write_metric_entity(graph, "improver-monthly-cycle", today.isoformat(), 30)
 
         result = check_overdue(graph_path=graph, today=today)
         assert len(result) == 1
         assert result[0]["slug"] == "monthly-accounting"
+
+    def test_improver_monthly_cycle_overdue_detection(self, tmp_path: Path) -> None:
+        """improver-monthly-cycle is tracked and surfaces as overdue when past 30 days."""
+        graph = tmp_path / "knowledge-graph.jsonl"
+        today = date(2026, 3, 16)
+        last_run = today - timedelta(days=35)  # 5 days overdue
+
+        _write_metric_entity(graph, "improver-monthly-cycle", last_run.isoformat(), 30)
+
+        result = check_overdue(graph_path=graph, today=today)
+        slugs = {r["slug"] for r in result}
+        assert "improver-monthly-cycle" in slugs
+
+        item = next(r for r in result if r["slug"] == "improver-monthly-cycle")
+        assert item["cadence_days"] == 30
+        assert item["overdue_days"] == 6
 
 
 # ---------------------------------------------------------------------------
@@ -201,6 +232,7 @@ class TestCheckOverdueMissingEntities:
         assert "weekly-review" not in slugs
         assert "monthly-accounting" in slugs
         assert "quarterly-hst" in slugs
+        assert "improver-monthly-cycle" in slugs
 
     def test_entity_with_no_last_run_observation_is_overdue(self, tmp_path: Path) -> None:
         graph = tmp_path / "knowledge-graph.jsonl"
@@ -312,11 +344,13 @@ class TestFormatStandupBlock:
         _write_metric_entity(graph, "weekly-review", "2026-01-01", 7)
         _write_metric_entity(graph, "monthly-accounting", "2026-01-01", 30)
         _write_metric_entity(graph, "quarterly-hst", "2025-01-01", 90)
+        _write_metric_entity(graph, "improver-monthly-cycle", "2026-01-01", 30)
 
         result = format_standup_block(graph_path=graph, today=today)
         assert "weekly-review" in result
         assert "monthly-accounting" in result
         assert "quarterly-hst" in result
+        assert "improver-monthly-cycle" in result
 
 
 class TestBuildCooStandup:

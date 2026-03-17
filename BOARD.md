@@ -1,7 +1,7 @@
 # Sprint Board
 
 > Maintained by COO Agent. Updated during daily standup.
-> Last updated: 2026-03-16
+> Last updated: 2026-03-17
 
 ## 🔴 Overdue
 
@@ -33,7 +33,7 @@
 
 | Prompt | Frequency | Last Run | Next Due |
 |--------|-----------|----------|----------|
-| Weekly review | Weekly | — | Week 1 |
-| Monthly accounting | Monthly | — | Month 1 |
-| Quarterly tax summary | Quarterly | — | Q2 2026 |
-| Improver monthly cycle | Monthly | — | Month 1 |
+| Weekly review | Weekly | — | 2026-03-23 |
+| Monthly accounting | Monthly | — | 2026-04-01 |
+| Quarterly HST filing | Quarterly | — | 2026-04-01 |
+| Improver monthly cycle | Monthly | — | 2026-04-01 |
