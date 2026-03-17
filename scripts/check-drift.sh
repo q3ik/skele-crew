@@ -65,8 +65,6 @@ done
 
 GRAPH_FILE="$REPO_ROOT/memory/knowledge-graph.jsonl"
 BOARD_FILE="$REPO_ROOT/BOARD.md"
-GRAPH_FILE="$REPO_ROOT/memory/knowledge-graph.jsonl"
-BOARD_FILE="$REPO_ROOT/BOARD.md"
 
 if [[ ! -f "$GRAPH_FILE" ]]; then
     echo "Error: knowledge-graph.jsonl not found at $GRAPH_FILE" >&2
