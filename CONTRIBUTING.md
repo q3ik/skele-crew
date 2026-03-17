@@ -32,10 +32,12 @@ After any meaningful decision, lesson, or event:
 {"type":"entity","name":"lesson:YYYY-MM-DD:short-description","entityType":"lesson","observations":["category: X","summary: what happened","action: what changed"]}
 ```
 
-### Reviewing Improver Proposals
+### Improver Proposals
 1. Check `PROPOSED_CHANGES.md` monthly (or when updated by Improver agent)
 2. For each proposal: APPROVE, REJECT, or DEFER with a note
 3. Apply approved changes manually (do not let Improver write directly to agent files)
+
+See [Reviewing Improver Proposals](#reviewing-improver-proposals) below for the full review process.
 
 ## File Ownership
 
@@ -60,6 +62,70 @@ Files containing `<!-- PROTECTED: ... -->` blocks are guarded by the pre-merge h
 - `main`: Always deployable, always reflects current state of the virtual company
 - `feature/issue-N-*`: Short-lived branches for individual issues
 - `proposal/*`: Improver agent proposals (never auto-merged)
+
+## Reviewing Improver Proposals
+
+The Improver agent generates `PROPOSED_CHANGES.md` after each monthly lesson review cycle. All proposals require human review before being applied. The Improver **never writes directly to agent or skill files**.
+
+### Proposal Branch Naming Convention
+
+Improver proposal branches follow the convention:
+
+```
+proposal/improver-YYYY-MM
+```
+
+Example: `proposal/improver-2026-03`
+
+These branches are **never auto-merged**. Open a pull request using the [Improver Proposal PR template](.github/PULL_REQUEST_TEMPLATE/improver-proposal.md) so the automated proposal check runs.
+
+### Review Checklist
+
+For each entry in `PROPOSED_CHANGES.md`, apply one of three decisions:
+
+| Decision | When to use | Action |
+|----------|-------------|--------|
+| **APPROVE** | Rationale is sound, change is safe, no protected sections touched | Apply the change manually (see below), then record in the Review Log |
+| **REJECT** | Change is incorrect, unnecessary, or out of scope | Add a note explaining why; the Improver should not re-propose without new evidence |
+| **DEFER** | Change may be valid but timing is wrong, or needs more data | Set a follow-up month; leave in `PROPOSED_CHANGES.md` with a DEFERRED note |
+
+Update the **Review Log** table in `PROPOSED_CHANGES.md` after each decision.
+
+### Applying Approved Skill Changes
+
+Skill files live in `.github/skills/[skill-name]/SKILL.md` and do not contain protected sections by default.
+
+1. Create a branch: `proposal/improver-YYYY-MM` (or use the existing proposal branch)
+2. Edit the skill file directly with the approved content
+3. Open a PR — the `proposal-check` workflow will run the pre-merge hook automatically
+4. Review the workflow output; if all checks pass, merge the PR
+5. Record the decision in the `PROPOSED_CHANGES.md` Review Log on `main`
+
+### Applying Approved Agent Changes
+
+Agent files (`.github/agents/*.agent.md`) may contain `<!-- PROTECTED: ... -->` sections. The pre-merge hook will **block any PR that modifies a protected section**.
+
+1. Verify the proposal does **not** touch any `<!-- PROTECTED: ... -->` block
+2. If it does, see [Edge Case: Protected Section Changes](#edge-case-protected-section-changes) below
+3. Create a branch: `proposal/improver-YYYY-MM`
+4. Apply the approved change to the agent file
+5. Open a PR — the `proposal-check` workflow runs automatically
+6. If the protected-sections check passes, merge the PR
+7. Record the decision in the `PROPOSED_CHANGES.md` Review Log on `main`
+
+### Edge Case: Protected Section Changes
+
+If the Improver proposes a change that touches a `<!-- PROTECTED: ... -->` block:
+
+1. **Do not apply via PR** — the pre-merge hook will block it regardless
+2. Evaluate whether the protected section truly needs to change
+3. If yes, modify the section **directly on `main`** (this bypasses the PR hook)
+4. Alternatively, temporarily disable the hook, document why, re-enable immediately after
+5. Always create a `decision` entity in the knowledge graph:
+   ```jsonl
+   {"type":"entity","name":"decision:YYYY-MM-DD:protected-section-modified","entityType":"decision","observations":["choice: modified <!-- PROTECTED: [tag] --> in [file]","rationale: [why]","agent: human","impact: [areas affected]"]}
+   ```
+6. The pre-merge hook's `CHECK 2` will also block any `PROPOSED_CHANGES.md` that **references a protected section tag inline** — this is by design.
 
 ## Resuming After a Break
 

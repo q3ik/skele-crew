@@ -1,0 +1,28 @@
+name: Proposal Check
+
+on:
+  pull_request:
+    branches: [main]
+    # Only run for proposal/* source branches
+    # The `if` condition on the job below enforces this filter; using
+    # paths-filter here would require an extra action, so we keep it simple.
+
+jobs:
+  proposal-check:
+    name: Proposal Pre-merge Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # Only run when the PR source branch matches proposal/*
+    if: startsWith(github.head_ref, 'proposal/')
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run pre-merge protection check
+        run: |
+          chmod +x .github/hooks/pre-merge-check.sh
+          .github/hooks/pre-merge-check.sh
