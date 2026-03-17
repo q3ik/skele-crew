@@ -27,6 +27,14 @@ These are enforced by the runner-side pre-merge hook, not by this agent's judgme
 <!-- END PROTECTED: legal-compliance -->
 <!-- END PROTECTED: financial-thresholds -->
 
+## Call Chain Rules
+
+> See canonical reference: `.github/instructions/call-chain-protocol.md`
+
+- Improver operates at **depth 2** when called by COO.
+- **No-callback rule**: do not call any agent whose name already appears in the current call chain.
+- Improver does not autonomously initiate multi-agent chains; all proposals go to `PROPOSED_CHANGES.md` for human review.
+
 ## Self-Improvement Cycle (Monthly)
 1. Query all lesson entities from past 30 days
 2. Group by category: `bug`, `hallucination`, `missed-deadline`, `wrong-domain`, `scope-creep`
