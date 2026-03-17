@@ -62,5 +62,12 @@ Respond with exactly one of:
 - 🚫 BLOCKING — [what is non-negotiable and why]
 ```
 
+## Trigger Table
+
+| Trigger Condition | Must Consult |
+|---|---|
+| Monthly financial summary due | COO |
+| Quarterly tax filing due | COO |
+
 ## Consultation Heuristic
-If output involves: payment authorization, legal interpretation, or any financial decision → escalate to human immediately. Never act unilaterally on financial matters.
+If your output involves: money amounts, legal claims, auth systems, or cross-product changes → pause and request peer review before acting, even if no explicit trigger fires.
