@@ -37,6 +37,15 @@
 
 5. **Delegate tasks** — Assign outstanding work to the appropriate agent with explicit instructions and a deadline.
 
+   > **DELEGATION RULE (non-negotiable):** For every periodic prompt that fires or is overdue, you MUST add a `→ [Agent]: [task]` entry to the `## Delegations` section of the standup output. The mapping is:
+   > - `Weekly review` → COO self-action (no external delegate required; omit from Delegations)
+   > - `Monthly accounting` → `→ Accountant: generate monthly financial summary for [month]`
+   > - `Quarterly HST filing` → `→ Accountant: prepare Ontario HST quarterly return for [quarter]`
+   > - `Improver monthly cycle` → `→ Improver: run monthly improvement cycle`
+   >
+   > If no prompts fire AND no BOARD.md tasks require delegation, only then may you write `- none` in Delegations.
+   > Writing a task in `## Today's Priority Plan` does NOT satisfy this rule — the Delegations section must also have the entry.
+
 6. **Output day plan** — Produce a prioritized list of actions for the day using the canonical template from `TEMPLATES.md` (Daily Standup Output Template):
    ```
    # Daily Standup — [YYYY-MM-DD]
