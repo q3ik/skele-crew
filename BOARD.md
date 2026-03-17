@@ -31,9 +31,9 @@
 
 ## 🔄 Periodic Prompts
 
-| Prompt | Frequency | Last Run | Next Due |
-|--------|-----------|----------|----------|
-| Weekly review | Weekly | — | 2026-03-23 |
-| Monthly accounting | Monthly | — | 2026-04-01 |
-| Quarterly HST filing | Quarterly | — | 2026-04-01 |
-| Improver monthly cycle | Monthly | — | 2026-04-01 |
+| Prompt | Slug | Frequency | Last Run | Next Due |
+|--------|------|-----------|----------|----------|
+| Weekly review | `weekly-review` | Weekly | — | 2026-03-23 |
+| Monthly accounting | `monthly-accounting` | Monthly | — | 2026-04-01 |
+| Quarterly HST filing | `quarterly-hst` | Quarterly | — | 2026-04-01 |
+| Improver monthly cycle | `improver-monthly-cycle` | Monthly | — | 2026-04-01 |

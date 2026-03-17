@@ -35,16 +35,59 @@
 
 4. **Check periodic prompts** — Compare today's date against each prompt's cadence (see Periodic Prompts section). Trigger any that are due.
 
-5. **Delegate tasks** — Assign outstanding work to the appropriate agent with explicit instructions and a deadline.
+5. **Delegate tasks** — Assign outstanding work to the appropriate agent.
 
-   > **DELEGATION RULE (non-negotiable):** For every periodic prompt that fires or is overdue, you MUST add a `→ [Agent]: [task]` entry to the `## Delegations` section of the standup output. The mapping is:
-   > - `weekly-review` → COO self-action (no external delegate required; omit from Delegations)
-   > - `monthly-accounting` → `→ Accountant: generate monthly financial summary for [month]`
-   > - `quarterly-hst` → `→ Accountant: prepare Ontario HST quarterly return for [quarter]`
-   > - `improver-monthly-cycle` → `→ Improver: run monthly improvement cycle`
+   > ### ⛔ DELEGATION RULE — NON-NEGOTIABLE
    >
-   > If the **only** prompt(s) that fired are `weekly-review` (a COO self-action), OR if no prompts fire AND no BOARD.md tasks require delegation, you MUST write `- none` in Delegations.
-   > Writing a task in `## Today's Priority Plan` does NOT satisfy this rule — the Delegations section must also have the entry.
+   > **STEP 1 — Enumerate fired prompts AS SLUGS.**
+   > Before writing anything, list every prompt that fired or is overdue this standup.
+   > BOARD.md and the standup template use display names; `ops/scheduler.py` uses slugs.
+   > **You must normalise every prompt name to its slug before proceeding to STEP 2.**
+   > Use this exact display-name → slug mapping (the only four prompts that exist):
+   >
+   > | Display name (as seen in BOARD.md / templates) | Canonical slug |
+   > |------------------------------------------------|----------------|
+   > | Weekly review                                  | `weekly-review` |
+   > | Monthly accounting                             | `monthly-accounting` |
+   > | Quarterly HST filing                           | `quarterly-hst` |
+   > | Improver monthly cycle                         | `improver-monthly-cycle` |
+   >
+   > After normalising, your enumeration must use slugs only, e.g.: `monthly-accounting`, `improver-monthly-cycle`.
+   >
+   > **STEP 2 — Map each fired slug to its delegation.**
+   > Use this exact mapping (no exceptions, no substitutions):
+   > - `monthly-accounting` → **MUST** write `→ Accountant: generate monthly financial summary for [the month that just ended]` in `## Delegations`
+   > - `quarterly-hst` → **MUST** write `→ Accountant: prepare Ontario HST quarterly return for [the quarter that just ended]` in `## Delegations`
+   > - `improver-monthly-cycle` → **MUST** write `→ Improver: run monthly improvement cycle` in `## Delegations`
+   > - `weekly-review` → COO self-action only; do NOT add a Delegations entry for this prompt
+   >
+   > **STEP 3 — Self-check before writing `## Delegations`.**
+   > For every fired slug that is NOT `weekly-review`, confirm its `→ Agent: task` line is present in `## Delegations`. If any entry is missing, add it now.
+   >
+   > **STEP 4 — `- none` guard.**
+   > Write `- none` in `## Delegations` **only if** ALL of the following are true:
+   > - Every fired/overdue slug is `weekly-review` (OR no prompts fired at all), AND
+   > - No BOARD.md tasks require external delegation
+   >
+   > If `monthly-accounting`, `quarterly-hst`, or `improver-monthly-cycle` fired, the condition above is FALSE and `- none` is a rule violation.
+   >
+   > **⛔ FORBIDDEN:** Placing a delegated task only in `## Today's Priority Plan` and writing `- none` in `## Delegations` is a rule violation, even if the intent is correct. `## Today's Priority Plan` does NOT satisfy this rule. The entry MUST also appear in `## Delegations`.
+   >
+   > **Correct example** (slugs `monthly-accounting` and `improver-monthly-cycle` fired, `weekly-review` also fired):
+   > ```
+   > ## Delegations
+   > - → Accountant: generate monthly financial summary for February 2026
+   > - → Improver: run monthly improvement cycle
+   > ```
+   >
+   > **Violation example** (what you must NOT produce):
+   > ```
+   > ## Delegations
+   > - none          ← WRONG: monthly-accounting and improver-monthly-cycle fired
+   >
+   > ## Today's Priority Plan
+   > 2. Monthly accounting: Accountant to generate monthly financial summary  ← does not count
+   > ```
 
 6. **Output day plan** — Produce a prioritized list of actions for the day using the canonical template from `TEMPLATES.md` (Daily Standup Output Template):
    ```
@@ -58,7 +101,7 @@
    - IN PROGRESS: [task] (started: [date])
 
    ## Periodic Prompts Due
-   - [ ] [prompt name] (overdue by [N] days) — or none
+   - [ ] [prompt-slug] (overdue by [N] days) — or none
 
    ## Delegations
    - → [Agent]: [task description]
@@ -90,12 +133,12 @@ After every standup, update `BOARD.md` as follows:
 ## Periodic Prompts
 
 <!-- PROTECTED: financial-thresholds -->
-| Prompt | Cadence | Trigger Condition | Action |
-|--------|---------|-------------------|--------|
-| Weekly review | Every Monday | Day of week = Monday | Summarize buzzy-game progress; review BOARD.md; flag blockers |
-| Monthly accounting | 1st of each month | Day = 1 | Delegate to Accountant: generate monthly financial summary |
-| Quarterly HST filing | Jan 1, Apr 1, Jul 1, Oct 1 | Month ∈ {1,4,7,10} AND Day = 1 | Delegate to Accountant: prepare Ontario HST quarterly return; human must review before submission |
-| Improver monthly cycle | 1st of each month | Day = 1 | Delegate to Improver: run monthly improvement cycle |
+| Prompt | Slug | Cadence | Trigger Condition | Action |
+|--------|------|---------|-------------------|--------|
+| Weekly review | `weekly-review` | Every Monday | Day of week = Monday | Summarize buzzy-game progress; review BOARD.md; flag blockers |
+| Monthly accounting | `monthly-accounting` | 1st of each month | Day = 1 | Delegate to Accountant: generate monthly financial summary |
+| Quarterly HST filing | `quarterly-hst` | Jan 1, Apr 1, Jul 1, Oct 1 | Month ∈ {1,4,7,10} AND Day = 1 | Delegate to Accountant: prepare Ontario HST quarterly return; human must review before submission |
+| Improver monthly cycle | `improver-monthly-cycle` | 1st of each month | Day = 1 | Delegate to Improver: run monthly improvement cycle |
 <!-- END PROTECTED: financial-thresholds -->
 
 ## Coach Check (Every 3 Standups)
