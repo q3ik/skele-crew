@@ -27,6 +27,9 @@ const STANDUP_PRUNE_DAYS = 7;
 /** Metric entities older than this many days are archived. */
 const METRIC_ARCHIVE_DAYS = 90;
 
+/** Prefix applied to the name of every archived metric entity. */
+const METRIC_ARCHIVE_PREFIX = 'metric:archive:';
+
 // ---------------------------------------------------------------------------
 // Date helpers
 // ---------------------------------------------------------------------------
@@ -98,6 +101,10 @@ function buildArchiveSummary(originalName: string, observations: string[], archi
 export interface PruneResult {
   entities: Entity[];
   relations: Relation[];
+  /** Number of standup entities removed. */
+  removedCount: number;
+  /** Number of metric entities converted to archive entities this run. */
+  archivedCount: number;
 }
 
 /**
@@ -106,10 +113,22 @@ export interface PruneResult {
  * The function is **pure** — it does not read or write the graph file; the caller
  * is responsible for persisting the returned result.
  *
+ * Rules applied in a single pass:
+ *   • `lesson`, `decision`, `deadline` — kept permanently.
+ *   • `metric` whose name starts with `metric:archive:` — kept permanently
+ *     (prevents repeated re-archiving on subsequent weekly runs).
+ *   • `standup` with a name-date older than 7 days — removed; dangling
+ *     relations are dropped.
+ *   • `metric` with a name-date older than 90 days — replaced by a
+ *     `metric:archive:<original-name>` entity; a Map ensures only one archive
+ *     entity exists per original name regardless of input duplicates.
+ *   • All other entities — kept unchanged.
+ *
  * @param entities  - Current entity array from the knowledge graph.
  * @param relations - Current relation array from the knowledge graph.
  * @param now       - Reference timestamp for age calculations (typically `new Date()`).
- * @returns         A new `{ entities, relations }` object with retention rules applied.
+ * @returns         A new `{ entities, relations, removedCount, archivedCount }` object
+ *                  with retention rules applied.
  */
 export function pruneGraph(entities: Entity[], relations: Relation[], now: Date): PruneResult {
   /** Names of entities that were completely removed (relations referencing them must be dropped). */
@@ -118,46 +137,65 @@ export function pruneGraph(entities: Entity[], relations: Relation[], now: Date)
   /** Mapping of old entity name → new archive name for renamed metric entities. */
   const renamedEntities = new Map<string, string>();
 
-  const prunedEntities: Entity[] = [];
+  /**
+   * Output entities keyed by name.
+   *
+   * Using a Map prevents duplicate entity names in the output.  When both the
+   * original metric entity AND a pre-existing archive entity are present in the
+   * input, the freshly-generated archive (set last) wins, keeping the summary
+   * up-to-date.
+   */
+  const entityMap = new Map<string, Entity>();
+
+  let removedCount = 0;
+  let archivedCount = 0;
 
   for (const entity of entities) {
-    // Permanent types are never removed.
     if (PERMANENT_TYPES.has(entity.entityType)) {
-      prunedEntities.push(entity);
-      continue;
-    }
-
-    if (entity.entityType === 'standup') {
+      // Permanent types are never removed.
+      entityMap.set(entity.name, entity);
+    } else if (entity.entityType === 'standup') {
       const date = parseDateFromName(entity.name);
       if (date !== null && isOlderThan(date, now, STANDUP_PRUNE_DAYS)) {
+        // Stale standup — remove and remember for relation cleanup.
         removedNames.add(entity.name);
-        // Entity is pruned — do not push to prunedEntities.
-        continue;
+        removedCount++;
+      } else {
+        entityMap.set(entity.name, entity);
       }
-      prunedEntities.push(entity);
-      continue;
-    }
-
-    if (entity.entityType === 'metric') {
-      const date = parseDateFromName(entity.name);
-      if (date !== null && isOlderThan(date, now, METRIC_ARCHIVE_DAYS)) {
-        const archiveName = `metric:archive:${entity.name}`;
-        const summaryObs = buildArchiveSummary(entity.name, entity.observations, now);
-        prunedEntities.push({
-          name: archiveName,
-          entityType: 'metric',
-          observations: summaryObs,
-        });
-        renamedEntities.set(entity.name, archiveName);
-        continue;
+    } else if (entity.entityType === 'metric') {
+      if (entity.name.startsWith(METRIC_ARCHIVE_PREFIX)) {
+        // Already-archived entities are kept permanently.
+        // Only set when the name is not already in the map — a freshly-generated
+        // archive for the same name (processed earlier in the loop) takes priority.
+        if (!entityMap.has(entity.name)) {
+          entityMap.set(entity.name, entity);
+        }
+      } else {
+        const date = parseDateFromName(entity.name);
+        if (date !== null && isOlderThan(date, now, METRIC_ARCHIVE_DAYS)) {
+          const archiveName = `${METRIC_ARCHIVE_PREFIX}${entity.name}`;
+          const summaryObs = buildArchiveSummary(entity.name, entity.observations, now);
+          // A freshly-generated archive always replaces any stale archive entity
+          // that might already be in the map from an earlier input line.
+          entityMap.set(archiveName, {
+            name: archiveName,
+            entityType: 'metric',
+            observations: summaryObs,
+          });
+          renamedEntities.set(entity.name, archiveName);
+          archivedCount++;
+        } else {
+          entityMap.set(entity.name, entity);
+        }
       }
-      prunedEntities.push(entity);
-      continue;
+    } else {
+      // All other entity types are kept as-is.
+      entityMap.set(entity.name, entity);
     }
-
-    // All other entity types are kept as-is.
-    prunedEntities.push(entity);
   }
+
+  const prunedEntities = Array.from(entityMap.values());
 
   // Update relations:
   //   • Drop relations that reference a removed entity.
@@ -170,5 +208,5 @@ export function pruneGraph(entities: Entity[], relations: Relation[], now: Date)
       relationType: r.relationType,
     }));
 
-  return { entities: prunedEntities, relations: prunedRelations };
+  return { entities: prunedEntities, relations: prunedRelations, removedCount, archivedCount };
 }

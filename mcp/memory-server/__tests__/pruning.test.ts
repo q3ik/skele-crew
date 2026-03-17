@@ -285,8 +285,159 @@ describe('pruneGraph — relation handling', () => {
 });
 
 // ---------------------------------------------------------------------------
-// pruneGraph — mixed graph
+// pruneGraph — idempotency and archive collision protection
 // ---------------------------------------------------------------------------
+
+describe('pruneGraph — idempotency and archive collision (Bugs 1 & 2)', () => {
+  const now = new Date('2026-03-17T12:00:00.000Z');
+
+  it('does not re-archive a metric:archive: entity on a second run (Bug 1 — double-archive)', () => {
+    const oldYM = isoYearMonth(daysAgo(100, now));
+    const archiveName = `metric:archive:metric:citation-tracking:${oldYM}`;
+    // Simulate the state AFTER a first pruning run: only the archive entity exists.
+    const entities: Entity[] = [
+      {
+        name: archiveName,
+        entityType: 'metric',
+        observations: ['archived_from:metric:citation-tracking:' + oldYM, 'sessions_tracked:5'],
+      },
+    ];
+    const { entities: result } = pruneGraph(entities, [], now);
+    // The archive entity must be kept as-is — not re-wrapped with another metric:archive: prefix.
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe(archiveName);
+    expect(result[0].name.startsWith('metric:archive:metric:archive:')).toBe(false);
+  });
+
+  it('pruneGraph is idempotent — running twice produces the same graph', () => {
+    const oldYM = isoYearMonth(daysAgo(100, now));
+    const staleDate = isoDate(daysAgo(8, now));
+    const entities: Entity[] = [
+      { name: `standup:${staleDate}`, entityType: 'standup', observations: [] },
+      {
+        name: `metric:citation-tracking:${oldYM}`,
+        entityType: 'metric',
+        observations: ['sessions_tracked:3'],
+      },
+      { name: 'product:buzzy-game', entityType: 'product', observations: [] },
+    ];
+
+    // First run
+    const first = pruneGraph(entities, [], now);
+    // Second run (uses the output of the first as input)
+    const second = pruneGraph(first.entities, first.relations, now);
+
+    expect(second.entities.map(e => e.name).sort()).toEqual(
+      first.entities.map(e => e.name).sort(),
+    );
+    // No additional items removed or archived on the second pass
+    expect(second.removedCount).toBe(0);
+    expect(second.archivedCount).toBe(0);
+  });
+
+  it('replaces a stale archive entity when input contains both the original metric and a prior archive (Bug 2 — collision)', () => {
+    const oldYM = isoYearMonth(daysAgo(100, now));
+    const originalName = `metric:citation-tracking:${oldYM}`;
+    const archiveName = `metric:archive:${originalName}`;
+
+    // Simulate a graph that somehow has BOTH the original metric and a prior archive
+    // (e.g. the original was re-added after a previous pruning run).
+    const entities: Entity[] = [
+      {
+        name: archiveName,
+        entityType: 'metric',
+        observations: ['archived_from:' + originalName, 'sessions_tracked:3', 'last_updated:2025-11-01'],
+      },
+      {
+        name: originalName,
+        entityType: 'metric',
+        observations: ['sessions_tracked:10', 'last_updated:2025-12-01'],
+      },
+    ];
+
+    const { entities: result } = pruneGraph(entities, [], now);
+
+    // There must be exactly one archive entity — no duplicates.
+    const archives = result.filter(e => e.name === archiveName);
+    expect(archives).toHaveLength(1);
+
+    // The archive entity should reflect the freshly-generated summary (from the
+    // original metric processed this run), not the stale prior archive.
+    expect(archives[0].observations).toContain('sessions_tracked:10');
+  });
+
+  it('replaces a stale archive when original metric appears before the prior archive in input', () => {
+    // Variant: original entity comes first in array (different processing order).
+    const oldYM = isoYearMonth(daysAgo(100, now));
+    const originalName = `metric:citation-tracking:${oldYM}`;
+    const archiveName = `metric:archive:${originalName}`;
+
+    const entities: Entity[] = [
+      {
+        name: originalName,
+        entityType: 'metric',
+        observations: ['sessions_tracked:10'],
+      },
+      {
+        name: archiveName,
+        entityType: 'metric',
+        observations: ['archived_from:' + originalName, 'sessions_tracked:3'],
+      },
+    ];
+
+    const { entities: result } = pruneGraph(entities, [], now);
+    const archives = result.filter(e => e.name === archiveName);
+    expect(archives).toHaveLength(1);
+    // Fresh archive must win regardless of input order.
+    expect(archives[0].observations).toContain('sessions_tracked:10');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// pruneGraph — PruneResult stats
+// ---------------------------------------------------------------------------
+
+describe('pruneGraph — result stats (removedCount, archivedCount)', () => {
+  const now = new Date('2026-03-17T12:00:00.000Z');
+
+  it('reports removedCount for stale standups', () => {
+    const stale1 = isoDate(daysAgo(10, now));
+    const stale2 = isoDate(daysAgo(20, now));
+    const recent = isoDate(daysAgo(2, now));
+    const entities: Entity[] = [
+      { name: `standup:${stale1}`, entityType: 'standup', observations: [] },
+      { name: `standup:${stale2}`, entityType: 'standup', observations: [] },
+      { name: `standup:${recent}`, entityType: 'standup', observations: [] },
+    ];
+    const result = pruneGraph(entities, [], now);
+    expect(result.removedCount).toBe(2);
+    expect(result.archivedCount).toBe(0);
+  });
+
+  it('reports archivedCount for old metrics', () => {
+    const oldYM1 = isoYearMonth(daysAgo(100, now));
+    const oldYM2 = isoYearMonth(daysAgo(200, now));
+    const recentYM = isoYearMonth(daysAgo(10, now));
+    const entities: Entity[] = [
+      { name: `metric:citation-tracking:${oldYM1}`, entityType: 'metric', observations: [] },
+      { name: `metric:citation-tracking:${oldYM2}`, entityType: 'metric', observations: [] },
+      { name: `metric:citation-tracking:${recentYM}`, entityType: 'metric', observations: [] },
+    ];
+    const result = pruneGraph(entities, [], now);
+    expect(result.archivedCount).toBe(2);
+    expect(result.removedCount).toBe(0);
+  });
+
+  it('reports zero counts when nothing is pruned', () => {
+    const entities: Entity[] = [
+      { name: 'product:buzzy-game', entityType: 'product', observations: [] },
+      { name: 'lesson:always-test', entityType: 'lesson', observations: [] },
+    ];
+    const result = pruneGraph(entities, [], now);
+    expect(result.removedCount).toBe(0);
+    expect(result.archivedCount).toBe(0);
+  });
+});
 
 describe('pruneGraph — mixed graph', () => {
   const now = new Date('2026-03-17T12:00:00.000Z');
