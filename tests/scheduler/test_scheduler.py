@@ -18,7 +18,7 @@ from ops.scheduler import (
     check_overdue,
     format_standup_block,
 )
-from ops.standup import build_coo_standup
+from ops.standup import build_coo_standup, verify_standup_entity
 
 
 # ---------------------------------------------------------------------------
@@ -373,3 +373,110 @@ class TestBuildCooStandup:
 
         sections = build_coo_standup(graph_path=graph, today=today)
         assert sections == []
+
+
+# ---------------------------------------------------------------------------
+# 6. verify_standup_entity — post-standup assertion
+# ---------------------------------------------------------------------------
+
+class TestVerifyStandupEntity:
+    """Tests for the post-standup assertion helper."""
+
+    def _write_standup_entity(
+        self,
+        graph_path: Path,
+        date_str: str,
+        delegations: str = "none",
+    ) -> None:
+        """Append a standup entity line to *graph_path* using the canonical schema."""
+        record = {
+            "type": "entity",
+            "name": f"standup:{date_str}",
+            "entityType": "standup",
+            "observations": [
+                "errors: 0",
+                "overdue-tasks: 0",
+                f"delegations: {delegations}",
+                "priority-1: none",
+            ],
+        }
+        with graph_path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record) + "\n")
+
+    def test_returns_true_when_entity_present(self, tmp_path: Path) -> None:
+        graph = tmp_path / "knowledge-graph.jsonl"
+        today = date(2026, 3, 16)
+        self._write_standup_entity(graph, today.isoformat())
+
+        assert verify_standup_entity(graph_path=graph, today=today) is True
+
+    def test_returns_false_when_entity_absent(self, tmp_path: Path) -> None:
+        graph = tmp_path / "knowledge-graph.jsonl"
+        today = date(2026, 3, 16)
+        # Write a different date's standup entity
+        self._write_standup_entity(graph, "2026-03-15")
+
+        assert verify_standup_entity(graph_path=graph, today=today) is False
+
+    def test_returns_false_when_graph_missing(self, tmp_path: Path) -> None:
+        graph = tmp_path / "does-not-exist.jsonl"
+        today = date(2026, 3, 16)
+
+        assert verify_standup_entity(graph_path=graph, today=today) is False
+
+    def test_returns_false_when_graph_empty(self, tmp_path: Path) -> None:
+        graph = tmp_path / "knowledge-graph.jsonl"
+        graph.write_text("", encoding="utf-8")
+        today = date(2026, 3, 16)
+
+        assert verify_standup_entity(graph_path=graph, today=today) is False
+
+    def test_returns_true_with_delegations_none_observation(self, tmp_path: Path) -> None:
+        """Gap 3: standup entity with explicit 'delegations: none' is found correctly."""
+        graph = tmp_path / "knowledge-graph.jsonl"
+        today = date(2026, 3, 16)
+        self._write_standup_entity(graph, today.isoformat(), delegations="none")
+
+        assert verify_standup_entity(graph_path=graph, today=today) is True
+
+    def test_corrupt_lines_do_not_prevent_detection(self, tmp_path: Path) -> None:
+        graph = tmp_path / "knowledge-graph.jsonl"
+        today = date(2026, 3, 16)
+
+        # Mix corrupt line with a valid standup entity (canonical schema)
+        with graph.open("w", encoding="utf-8") as fh:
+            fh.write("THIS IS NOT JSON\n")
+            fh.write(json.dumps({
+                "type": "entity",
+                "name": f"standup:{today.isoformat()}",
+                "entityType": "standup",
+                "observations": ["errors: 0", "overdue-tasks: 0", "delegations: none", "priority-1: none"],
+            }) + "\n")
+
+        assert verify_standup_entity(graph_path=graph, today=today) is True
+
+    def test_defaults_to_today_date(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """verify_standup_entity uses date.today() when no explicit date is given."""
+        import ops.standup as standup_module
+        from datetime import date as real_date
+
+        fixed_date = date(2026, 3, 16)
+
+        class _FakeDate(real_date):
+            @classmethod
+            def today(cls) -> real_date:  # type: ignore[override]
+                return fixed_date
+
+        monkeypatch.setattr(standup_module, "date", _FakeDate)
+
+        graph = tmp_path / "knowledge-graph.jsonl"
+        with graph.open("w", encoding="utf-8") as fh:
+            fh.write(json.dumps({
+                "type": "entity",
+                "name": "standup:2026-03-16",
+                "entityType": "standup",
+                "observations": ["errors: 0", "overdue-tasks: 0", "delegations: none", "priority-1: none"],
+            }) + "\n")
+
+        # Pass graph_path but no today — should resolve to fixed_date via monkeypatched today()
+        assert verify_standup_entity(graph_path=graph) is True
