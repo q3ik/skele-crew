@@ -166,8 +166,8 @@ Respond with exactly one of:
 - IN PROGRESS: [task] (started: [date])
 
 ## Periodic Prompts Due
-- [ ] Weekly review (overdue by [N] days)
-- [x] Monthly accounting (completed [date])
+- [ ] weekly-review (overdue by [N] days)
+- [x] monthly-accounting (completed [date])
 
 ## Delegations
 - → [Agent]: [task description]
