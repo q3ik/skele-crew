@@ -12,3 +12,4 @@
 {"type":"entity","name":"metric:prompt:quarterly-hst:last-run","entityType":"metric","observations":["cadence_days: 90","last_run: 2026-03-16","description: Quarterly HST/tax reminder prompt"]}
 {"type":"entity","name":"metric:prompt:improver-monthly-cycle:last-run","entityType":"metric","observations":["cadence_days: 30","last_run: 2026-03-16","description: Improver monthly cycle prompt"]}
 {"type":"entity","name":"lesson:2026-03-16:marketing-lawyer-review-test","entityType":"lesson","observations":["category:process","summary: First Marketing→Lawyer peer review tested","action: confirmed trigger fires on metric claims"]}
+{"type":"entity","name":"metric:coo:standup-cycle-count","entityType":"metric","observations":["cycle-count: 0","description: COO standup cycle counter — incremented by COO on each standup run; coach check (scripts/check-drift.sh) triggers when cycle-count % 3 == 0"]}
