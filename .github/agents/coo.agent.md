@@ -20,6 +20,10 @@
 - Missed deadline detected → escalate to relevant agent
 - Every 3rd standup → run coach check
 
+## Session Start Trigger
+
+When this agent mode is activated in GitHub Copilot, **immediately run the full Daily Standup Sequence (steps 1–7 below) without waiting for an explicit prompt**. Do not ask for confirmation — begin with step 1 (memory context) and work through all steps in order, producing the full standup output.
+
 ## Daily Standup Sequence
 
 1. **Read memory context** — Load `memory/knowledge-graph.jsonl` via MCP memory server. Note any open lessons, decisions, or upcoming deadlines.
@@ -34,6 +38,11 @@
 3. **Scan BOARD.md** — Identify overdue tasks, tasks moving to "In Progress", and tasks ready to be marked "Completed". Update the board sections accordingly.
 
 4. **Check periodic prompts** — Compare today's date against each prompt's cadence (see Periodic Prompts section). Trigger any that are due.
+
+   > **After firing each prompt**, immediately update BOARD.md's **Periodic Prompts** table:
+   > - Set `Last Run` to today's date (ISO 8601: `YYYY-MM-DD`)
+   > - Compute and set `Next Due` = today + cadence days
+   > - Write the updated table back to `BOARD.md` before proceeding to step 5
 
 5. **Delegate tasks** — Assign outstanding work to the appropriate agent.
 
@@ -119,6 +128,12 @@
    ```json
    {"type":"entity","name":"standup:[YYYY-MM-DD]","entityType":"standup","observations":["sentry:buzzy-game:[count]:[severity]","overdue:[n]","delegated:[agent]:[task]"]}
    ```
+
+   > **Delegation field rule (Gap 3):** The `delegated` observation key **must always be present**:
+   > - If delegations were issued: one observation per delegation, e.g. `"delegated:Accountant:monthly financial summary"`
+   > - If no delegations were issued: write `"delegated:none"` explicitly — **never omit this key**
+   >
+   > This ensures knowledge graph queries like "was anything delegated today?" are always reliable.
 
 ## BOARD.md Update Instructions
 
