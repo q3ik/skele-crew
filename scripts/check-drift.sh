@@ -63,7 +63,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-REPO_ROOT="$(cd "$REPO_ROOT" && pwd)"
+GRAPH_FILE="$REPO_ROOT/memory/knowledge-graph.jsonl"
+BOARD_FILE="$REPO_ROOT/BOARD.md"
 GRAPH_FILE="$REPO_ROOT/memory/knowledge-graph.jsonl"
 BOARD_FILE="$REPO_ROOT/BOARD.md"
 
