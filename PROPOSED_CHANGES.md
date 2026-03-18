@@ -6,17 +6,9 @@
 
 ## Pending Proposals
 
-_(No proposals yet — Improver agent has not completed its first monthly cycle)_
+_(No proposals yet — Improver agent has not completed its first monthly cycle.)_
 
 ---
-
-## How to Review
-
-1. Read each proposal and its rationale
-2. For skill file changes: verify technical accuracy
-3. For agent file changes: verify the change doesn't touch a protected section
-4. For new agent proposals: assess whether the domain gap is real and recurring
-5. Mark as: **APPROVED** / **REJECTED** / **DEFERRED** with a brief note
 
 ## Review Log
 
