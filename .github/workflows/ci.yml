@@ -80,12 +80,16 @@ jobs:
   # -----------------------------------------------------------------------
   # Protected sections check — validates manifest-listed files haven't had
   # PROTECTED blocks altered without human review.
-  # Runs on PRs to main only.
+  # Runs on PRs to main only, excluding proposal/* branches (those are
+  # handled exclusively by the proposal-check workflow).
   # -----------------------------------------------------------------------
   protected-sections:
     name: Protected Sections Check
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    if: >
+      github.event_name == 'pull_request' &&
+      github.base_ref == 'main' &&
+      !startsWith(github.head_ref, 'proposal/')
 
     steps:
       - name: Checkout PR branch
@@ -93,7 +97,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run pre-merge protection check
+      - name: Run pre-merge protection check (base-branch hook)
+        # Security: fetch the hook from the base branch so a PR cannot replace
+        # the script to bypass the protected-sections gate.
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
         run: |
-          chmod +x .github/hooks/pre-merge-check.sh
-          .github/hooks/pre-merge-check.sh
+          git show "origin/${GITHUB_BASE_REF}:.github/hooks/pre-merge-check.sh" \
+            > "/tmp/pre-merge-check-${{ github.run_id }}.sh"
+          chmod +x "/tmp/pre-merge-check-${{ github.run_id }}.sh"
+          "/tmp/pre-merge-check-${{ github.run_id }}.sh"
