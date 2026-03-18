@@ -1,0 +1,24 @@
+name: Protected Sections Check
+
+on: [pull_request]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Make hook executable
+        run: chmod +x .github/hooks/pre-merge-check.sh
+
+      - name: Run protected-sections pre-merge check
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+        run: bash .github/hooks/pre-merge-check.sh
