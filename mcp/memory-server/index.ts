@@ -363,8 +363,9 @@ export class KnowledgeGraphManager {
 
   async deleteEntities(entityNames: string[]): Promise<void> {
     await this.modifyGraph(graph => {
-      graph.entities = graph.entities.filter(e => !entityNames.includes(e.name));
-      graph.relations = graph.relations.filter(r => !entityNames.includes(r.from) && !entityNames.includes(r.to));
+      const entityNameSet = new Set(entityNames);
+      graph.entities = graph.entities.filter(e => !entityNameSet.has(e.name));
+      graph.relations = graph.relations.filter(r => !entityNameSet.has(r.from) && !entityNameSet.has(r.to));
     });
   }
 
