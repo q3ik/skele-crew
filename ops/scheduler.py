@@ -82,41 +82,42 @@ def _load_metric_entities(graph_path: Path) -> dict[str, dict[str, str]]:
     if not graph_path.exists():
         return metrics
 
-    for raw_line in graph_path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        try:
-            record: Any = json.loads(line)
-        except json.JSONDecodeError:
-            continue
+    with graph_path.open("r", encoding="utf-8") as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                record: Any = json.loads(line)
+            except json.JSONDecodeError:
+                continue
 
-        if not isinstance(record, dict):
-            continue
-        if record.get("type") != "entity":
-            continue
-        name = record.get("name", "")
-        m = _ENTITY_NAME_PATTERN.match(name)
-        if not m:
-            continue
+            if not isinstance(record, dict):
+                continue
+            if record.get("type") != "entity":
+                continue
+            name = record.get("name", "")
+            m = _ENTITY_NAME_PATTERN.match(name)
+            if not m:
+                continue
 
-        slug = m.group(1)
-        # Deduplicate: keep the first occurrence of each metric entity to align
-        # with KnowledgeGraphManager's "first wins" behaviour.
-        if slug in metrics:
-            continue
+            slug = m.group(1)
+            # Deduplicate: keep the first occurrence of each metric entity to align
+            # with KnowledgeGraphManager's "first wins" behaviour.
+            if slug in metrics:
+                continue
 
-        observations = record.get("observations")
-        if not isinstance(observations, list):
-            continue
+            observations = record.get("observations")
+            if not isinstance(observations, list):
+                continue
 
-        obs_map: dict[str, str] = {}
-        for obs in observations:
-            if isinstance(obs, str) and ": " in obs:
-                key, _, value = obs.partition(": ")
-                obs_map[key.strip()] = value.strip()
+            obs_map: dict[str, str] = {}
+            for obs in observations:
+                if isinstance(obs, str) and ": " in obs:
+                    key, _, value = obs.partition(": ")
+                    obs_map[key.strip()] = value.strip()
 
-        metrics[slug] = obs_map
+            metrics[slug] = obs_map
 
     return metrics
 
