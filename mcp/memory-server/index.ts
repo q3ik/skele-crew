@@ -370,8 +370,11 @@ export class KnowledgeGraphManager {
 
   async deleteObservations(deletions: { entityName: string; observations: string[] }[]): Promise<void> {
     await this.modifyGraph(graph => {
+      const entityMap = new Map<string, typeof graph.entities[0]>();
+      graph.entities.forEach(e => entityMap.set(e.name, e));
+
       deletions.forEach(d => {
-        const entity = graph.entities.find(e => e.name === d.entityName);
+        const entity = entityMap.get(d.entityName);
         if (entity) {
           entity.observations = entity.observations.filter(o => !d.observations.includes(o));
         }
