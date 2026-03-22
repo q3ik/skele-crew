@@ -381,11 +381,10 @@ export class KnowledgeGraphManager {
 
   async deleteRelations(relations: Relation[]): Promise<void> {
     await this.modifyGraph(graph => {
-      graph.relations = graph.relations.filter(r => !relations.some(del =>
-        r.from === del.from &&
-        r.to === del.to &&
-        r.relationType === del.relationType
-      ));
+      const delSet = new Set(relations.map(del => `${del.from}\x00${del.to}\x00${del.relationType}`));
+      graph.relations = graph.relations.filter(r =>
+        !delSet.has(`${r.from}\x00${r.to}\x00${r.relationType}`)
+      );
     });
   }
 
