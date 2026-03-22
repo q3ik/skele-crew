@@ -12,7 +12,7 @@ import { promises as fs } from 'fs';
 import { randomUUID } from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { KnowledgeGraphManager, Entity, defaultMemoryPath, ensureMemoryFilePath } from '../index.js';
+import { KnowledgeGraphManager, Entity, defaultMemoryPath, ensureMemoryFilePath, migrateLegacyJson } from '../index.js';
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -84,6 +84,118 @@ describe('Hardening #1 — async mutex prevents concurrent write corruption', ()
 
     const graph = await manager.readGraph();
     expect(graph.entities).toHaveLength(20);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hardening #5 — Legacy migration properly converts JSON → JSONL
+// ---------------------------------------------------------------------------
+describe('Hardening #5 — legacy JSON migration', () => {
+  let oldPath: string;
+  let newPath: string;
+
+  beforeEach(() => {
+    oldPath = tmpFile('-old.json');
+    newPath = tmpFile('-new.jsonl');
+  });
+
+  afterEach(async () => {
+    await cleanup(oldPath, newPath, `${newPath}.tmp`);
+  });
+
+  it('successfully migrates a valid legacy memory.json to JSONL and deletes the old file', async () => {
+    const legacyData = {
+      entities: [
+        { name: 'Entity1', entityType: 'test', observations: ['obs1'] }
+      ],
+      relations: [
+        { from: 'Entity1', to: 'Entity2', relationType: 'relates_to' }
+      ]
+    };
+    await fs.writeFile(oldPath, JSON.stringify(legacyData), 'utf-8');
+
+    await migrateLegacyJson(oldPath, newPath);
+
+    // Old file should be deleted
+    await expect(fs.access(oldPath)).rejects.toThrow();
+
+    // New file should exist and contain valid JSONL
+    const content = await fs.readFile(newPath, 'utf-8');
+    const lines = content.split('\n').filter(l => l.trim());
+    expect(lines).toHaveLength(2);
+
+    const parsedLines = lines.map(l => JSON.parse(l));
+    expect(parsedLines[0]).toMatchObject({
+      type: 'entity',
+      name: 'Entity1',
+      entityType: 'test',
+      observations: ['obs1']
+    });
+    expect(parsedLines[1]).toMatchObject({
+      type: 'relation',
+      from: 'Entity1',
+      to: 'Entity2',
+      relationType: 'relates_to'
+    });
+  });
+
+  it('throws an error if the old file is not valid JSON', async () => {
+    await fs.writeFile(oldPath, 'NOT JSON', 'utf-8');
+
+    await expect(migrateLegacyJson(oldPath, newPath)).rejects.toThrow(
+      /is not valid JSON; cannot migrate safely/
+    );
+
+    // Old file should remain
+    await expect(fs.access(oldPath)).resolves.toBeUndefined();
+  });
+
+  it('throws an error if the old file has an unexpected structure (not an object)', async () => {
+    await fs.writeFile(oldPath, '["array", "not", "object"]', 'utf-8');
+
+    await expect(migrateLegacyJson(oldPath, newPath)).rejects.toThrow(
+      /has an unexpected structure; cannot migrate safely/
+    );
+
+    // Old file should remain
+    await expect(fs.access(oldPath)).resolves.toBeUndefined();
+  });
+
+  it('throws an error if the old file is an object but missing entities/relations arrays', async () => {
+    await fs.writeFile(oldPath, '{"foo":"bar"}', 'utf-8');
+
+    await expect(migrateLegacyJson(oldPath, newPath)).rejects.toThrow(
+      /has an unexpected structure; cannot migrate safely/
+    );
+  });
+
+  it('skips invalid entities/relations during migration and only writes valid ones', async () => {
+    const legacyData = {
+      entities: [
+        { name: 'ValidEntity', entityType: 'test', observations: [] },
+        { invalid: 'entity' } // Missing name/entityType
+      ],
+      relations: [
+        { from: 'ValidEntity', to: 'Other', relationType: 'knows' },
+        { to: 'MissingFrom' } // Missing from/relationType
+      ]
+    };
+    await fs.writeFile(oldPath, JSON.stringify(legacyData), 'utf-8');
+
+    // Use a spy to suppress the expected console.error logs so they don't clutter test output
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await migrateLegacyJson(oldPath, newPath);
+
+    consoleSpy.mockRestore();
+
+    const content = await fs.readFile(newPath, 'utf-8');
+    const lines = content.split('\n').filter(l => l.trim());
+    expect(lines).toHaveLength(2);
+
+    const parsedLines = lines.map(l => JSON.parse(l));
+    expect(parsedLines[0].name).toBe('ValidEntity');
+    expect(parsedLines[1].from).toBe('ValidEntity');
   });
 });
 

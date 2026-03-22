@@ -78,7 +78,7 @@ async function atomicWrite(destPath: string, content: string): Promise<void> {
  * atomically.  If the format is unrecognised it throws rather than silently
  * producing a corrupt JSONL file.
  */
-async function migrateLegacyJson(oldPath: string, newPath: string): Promise<void> {
+export async function migrateLegacyJson(oldPath: string, newPath: string): Promise<void> {
   const content = await fs.readFile(oldPath, 'utf-8');
 
   let parsed: unknown;
