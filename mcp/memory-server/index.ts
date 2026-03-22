@@ -337,11 +337,15 @@ export class KnowledgeGraphManager {
 
   async createRelations(relations: Relation[]): Promise<Relation[]> {
     return this.modifyGraph(graph => {
-      const newRelations = relations.filter(r => !graph.relations.some(existing =>
-        existing.from === r.from &&
-        existing.to === r.to &&
-        existing.relationType === r.relationType
-      ));
+      const existingSet = new Set(
+        graph.relations.map(r => `${r.from}\0${r.to}\0${r.relationType}`)
+      );
+      const newRelations = relations.filter(r => {
+        const key = `${r.from}\0${r.to}\0${r.relationType}`;
+        if (existingSet.has(key)) return false;
+        existingSet.add(key);
+        return true;
+      });
       graph.relations.push(...newRelations);
       return newRelations;
     });
