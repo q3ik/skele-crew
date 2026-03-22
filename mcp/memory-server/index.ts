@@ -349,8 +349,9 @@ export class KnowledgeGraphManager {
 
   async addObservations(observations: { entityName: string; contents: string[] }[]): Promise<{ entityName: string; addedObservations: string[] }[]> {
     return this.modifyGraph(graph => {
+      const entityMap = new Map<string, Entity>(graph.entities.map(e => [e.name, e]));
       return observations.map(o => {
-        const entity = graph.entities.find(e => e.name === o.entityName);
+        const entity = entityMap.get(o.entityName);
         if (!entity) {
           throw new Error(`Entity with name ${o.entityName} not found`);
         }
