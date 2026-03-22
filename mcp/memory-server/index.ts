@@ -329,7 +329,8 @@ export class KnowledgeGraphManager {
 
   async createEntities(entities: Entity[]): Promise<Entity[]> {
     return this.modifyGraph(graph => {
-      const newEntities = entities.filter(e => !graph.entities.some(existing => existing.name === e.name));
+      const existingNames = new Set(graph.entities.map(e => e.name));
+      const newEntities = entities.filter(e => !existingNames.has(e.name));
       graph.entities.push(...newEntities);
       return newEntities;
     });
